@@ -1,6 +1,10 @@
 package com.blossom.foldstand.data
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
 import com.blossom.foldstand.domain.AmbientPreset
 import com.blossom.foldstand.domain.AutoDimOption
 import com.blossom.foldstand.domain.ClockStyle
@@ -26,10 +30,11 @@ class SettingsRepositoryTest {
     @get:Rule val temporaryFolder = TemporaryFolder()
     private lateinit var scope: CoroutineScope
     private lateinit var repository: SettingsRepository
+    private lateinit var dataStore: DataStore<Preferences>
 
     @Before fun setUp() {
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val dataStore = PreferenceDataStoreFactory.create(scope = scope) {
+        dataStore = PreferenceDataStoreFactory.create(scope = scope) {
             File(temporaryFolder.root, "settings.preferences_pb")
         }
         repository = SettingsRepository(dataStore)
@@ -71,5 +76,15 @@ class SettingsRepositoryTest {
         assertEquals(listOf(0xFF112233, 0xFF445566, 0xFF778899), restored.customColors)
         assertEquals(2, restored.ambientColorIndex)
         assertTrue(restored.isRunning)
+    }
+
+    @Test fun legacyBooleanNightModeIsMigrated() = runBlocking {
+        val legacyKey = booleanPreferencesKey("night_mode")
+        dataStore.edit { preferences -> preferences[legacyKey] = false }
+
+        assertEquals(NightModeOption.Off, repository.settings.first().nightMode)
+
+        dataStore.edit { preferences -> preferences[legacyKey] = true }
+        assertEquals(NightModeOption.Auto, repository.settings.first().nightMode)
     }
 }

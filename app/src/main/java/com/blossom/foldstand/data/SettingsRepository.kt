@@ -48,7 +48,7 @@ class SettingsRepository(
         keepScreenOn = preferences[Keys.keepScreenOn] ?: true,
         burnInProtection = preferences[Keys.burnInProtection] ?: true,
         powerSavingAnimation = preferences[Keys.powerSavingAnimation] ?: true,
-        nightMode = enumOrDefault(preferences[Keys.nightModeOption], NightModeOption.Auto),
+        nightMode = decodeNightMode(preferences),
         autoDim = enumOrDefault(preferences[Keys.autoDim], AutoDimOption.FifteenMinutes),
         reverseVerticalPanes = preferences[Keys.reverseVerticalPanes] ?: false,
         suggestWhenCharging = preferences[Keys.suggestWhenCharging] ?: false,
@@ -90,6 +90,15 @@ class SettingsRepository(
     private inline fun <reified T : Enum<T>> enumOrDefault(value: String?, default: T): T =
         enumValues<T>().firstOrNull { it.name == value } ?: default
 
+    private fun decodeNightMode(preferences: Preferences): NightModeOption =
+        preferences[Keys.nightModeOption]?.let { value ->
+            enumOrDefault(value, NightModeOption.Auto)
+        } ?: when (preferences[Keys.legacyNightMode]) {
+            true -> NightModeOption.Auto
+            false -> NightModeOption.Off
+            null -> NightModeOption.Auto
+        }
+
     private object Keys {
         val clockStyle = stringPreferencesKey("clock_style")
         val ambientPreset = stringPreferencesKey("ambient_preset")
@@ -102,6 +111,7 @@ class SettingsRepository(
         val burnInProtection = booleanPreferencesKey("burn_in_protection")
         val powerSavingAnimation = booleanPreferencesKey("power_saving_animation")
         val nightModeOption = stringPreferencesKey("night_mode_option")
+        val legacyNightMode = booleanPreferencesKey("night_mode")
         val autoDim = stringPreferencesKey("auto_dim")
         val reverseVerticalPanes = booleanPreferencesKey("reverse_vertical_panes")
         val suggestWhenCharging = booleanPreferencesKey("suggest_when_charging")
