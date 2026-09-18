@@ -56,6 +56,7 @@ import com.blossom.foldstand.domain.AutoDimOption
 import com.blossom.foldstand.domain.ClockStyle
 import com.blossom.foldstand.domain.DualScreenStatus
 import com.blossom.foldstand.domain.StandbySettings
+import com.blossom.foldstand.domain.NightModeOption
 import com.blossom.foldstand.domain.readableName
 import kotlin.math.roundToInt
 
@@ -136,6 +137,13 @@ fun SettingsScreen(
                             },
                         )
                     }
+                    Text("기본 엠비언트 색상", style = MaterialTheme.typography.titleSmall)
+                    ChoiceRow(
+                        values = settings.customColors.indices.toList(),
+                        selected = settings.ambientColorIndex,
+                        label = { "색상 ${it + 1}" },
+                        onSelected = { index -> onSettingsChange { it.copy(ambientColorIndex = index) } },
+                    )
                 }
             }
 
@@ -172,9 +180,18 @@ fun SettingsScreen(
                     SwitchRow("절전 애니메이션", "15fps 이하로 부드럽게 움직임", settings.powerSavingAnimation) {
                         onSettingsChange { old -> old.copy(powerSavingAnimation = it) }
                     }
-                    SwitchRow("야간 모드", "22:00~07:00에 Apple StandBy처럼 붉은 저휘도 톤", settings.nightMode) {
-                        onSettingsChange { old -> old.copy(nightMode = it) }
-                    }
+                    Text("야간 모드", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "켬은 항상 붉은 톤과 저밝기, 자동은 조도센서가 어두움을 감지했을 때만 적용합니다.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    ChoiceRow(
+                        values = NightModeOption.entries,
+                        selected = settings.nightMode,
+                        label = { it.label },
+                        onSelected = { option -> onSettingsChange { it.copy(nightMode = option) } },
+                    )
                     SwitchRow("번인 방지", "시계 위치를 주기적으로 미세 이동", settings.burnInProtection) {
                         onSettingsChange { old -> old.copy(burnInProtection = it) }
                     }

@@ -28,12 +28,15 @@ import kotlin.math.sin
 fun AmbientPane(
     preset: AmbientPreset,
     colorValues: List<Long>,
+    primaryColorIndex: Int = 0,
     powerSaving: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val colors = remember(colorValues) {
+    val colors = remember(colorValues, primaryColorIndex) {
         val safe = if (colorValues.size >= 3) colorValues else DEFAULT_AMBIENT_COLORS
-        safe.take(3).map(::Color)
+        val primary = primaryColorIndex.coerceIn(0, safe.lastIndex)
+        val ordered = listOf(safe[primary]) + safe.indices.filter { it != primary }.map { safe[it] }.take(2)
+        ordered.map(::Color)
     }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var phase by remember { mutableFloatStateOf(0.18f) }

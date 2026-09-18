@@ -43,6 +43,7 @@ fun ClockPane(
     battery: BatteryState,
     modifier: Modifier = Modifier,
     burnInOffset: Offset = Offset.Zero,
+    nightTint: Boolean = false,
 ) {
     val now by currentClockTime(showSeconds = settings.showSeconds)
     val timePattern = when {
@@ -87,7 +88,7 @@ fun ClockPane(
         ) {
             Text(
                 text = timeText,
-                color = Color(0xFFF5F5F5),
+                color = if (nightTint) Color(0xFFFF6B6B) else Color(0xFFF5F5F5),
                 fontSize = (if (minimal) maxClockSp * 0.86f else maxClockSp).sp,
                 fontWeight = if (minimal) FontWeight.Light else FontWeight.Black,
                 fontFamily = FontFamily.SansSerif,
@@ -98,7 +99,7 @@ fun ClockPane(
                 Text(
                     text = dateText,
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color(0xFFA6A6A6),
+                    color = if (nightTint) Color(0xFFE06B6B) else Color(0xFFA6A6A6),
                     modifier = Modifier.padding(top = if (minimal) 6.dp else 2.dp),
                     maxLines = 1,
                 )
@@ -116,9 +117,9 @@ fun ClockPane(
                             Icons.Default.BatteryStd
                         },
                         contentDescription = if (battery.isCharging) "충전 중" else "배터리 사용 중",
-                        tint = Color(0xFFA6A6A6),
+                        tint = if (nightTint) Color(0xFFE06B6B) else Color(0xFFA6A6A6),
                     )
-                    Text(batteryText, color = Color(0xFFA6A6A6))
+                    Text(batteryText, color = if (nightTint) Color(0xFFE06B6B) else Color(0xFFA6A6A6))
                 }
             }
         }

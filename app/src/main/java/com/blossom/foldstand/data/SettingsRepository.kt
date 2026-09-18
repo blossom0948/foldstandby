@@ -6,12 +6,14 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.blossom.foldstand.domain.AmbientPreset
 import com.blossom.foldstand.domain.AutoDimOption
 import com.blossom.foldstand.domain.ClockStyle
 import com.blossom.foldstand.domain.DEFAULT_AMBIENT_COLORS
 import com.blossom.foldstand.domain.StandbySettings
+import com.blossom.foldstand.domain.NightModeOption
 import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -46,7 +48,7 @@ class SettingsRepository(
         keepScreenOn = preferences[Keys.keepScreenOn] ?: true,
         burnInProtection = preferences[Keys.burnInProtection] ?: true,
         powerSavingAnimation = preferences[Keys.powerSavingAnimation] ?: true,
-        nightMode = preferences[Keys.nightMode] ?: true,
+        nightMode = enumOrDefault(preferences[Keys.nightModeOption], NightModeOption.Auto),
         autoDim = enumOrDefault(preferences[Keys.autoDim], AutoDimOption.FifteenMinutes),
         reverseVerticalPanes = preferences[Keys.reverseVerticalPanes] ?: false,
         suggestWhenCharging = preferences[Keys.suggestWhenCharging] ?: false,
@@ -56,6 +58,7 @@ class SettingsRepository(
             preferences[Keys.color2] ?: DEFAULT_AMBIENT_COLORS[1],
             preferences[Keys.color3] ?: DEFAULT_AMBIENT_COLORS[2],
         ),
+        ambientColorIndex = (preferences[Keys.ambientColorIndex] ?: 0).coerceIn(0, 2),
         isRunning = preferences[Keys.isRunning] ?: false,
         hasSeenManualStartNotice = preferences[Keys.hasSeenManualStartNotice] ?: false,
     )
@@ -71,7 +74,7 @@ class SettingsRepository(
         preferences[Keys.keepScreenOn] = value.keepScreenOn
         preferences[Keys.burnInProtection] = value.burnInProtection
         preferences[Keys.powerSavingAnimation] = value.powerSavingAnimation
-        preferences[Keys.nightMode] = value.nightMode
+        preferences[Keys.nightModeOption] = value.nightMode.name
         preferences[Keys.autoDim] = value.autoDim.name
         preferences[Keys.reverseVerticalPanes] = value.reverseVerticalPanes
         preferences[Keys.suggestWhenCharging] = value.suggestWhenCharging
@@ -79,6 +82,7 @@ class SettingsRepository(
         preferences[Keys.color1] = value.customColors.getOrElse(0) { DEFAULT_AMBIENT_COLORS[0] }
         preferences[Keys.color2] = value.customColors.getOrElse(1) { DEFAULT_AMBIENT_COLORS[1] }
         preferences[Keys.color3] = value.customColors.getOrElse(2) { DEFAULT_AMBIENT_COLORS[2] }
+        preferences[Keys.ambientColorIndex] = value.ambientColorIndex.coerceIn(0, 2)
         preferences[Keys.isRunning] = value.isRunning
         preferences[Keys.hasSeenManualStartNotice] = value.hasSeenManualStartNotice
     }
@@ -97,7 +101,7 @@ class SettingsRepository(
         val keepScreenOn = booleanPreferencesKey("keep_screen_on")
         val burnInProtection = booleanPreferencesKey("burn_in_protection")
         val powerSavingAnimation = booleanPreferencesKey("power_saving_animation")
-        val nightMode = booleanPreferencesKey("night_mode")
+        val nightModeOption = stringPreferencesKey("night_mode_option")
         val autoDim = stringPreferencesKey("auto_dim")
         val reverseVerticalPanes = booleanPreferencesKey("reverse_vertical_panes")
         val suggestWhenCharging = booleanPreferencesKey("suggest_when_charging")
@@ -105,6 +109,7 @@ class SettingsRepository(
         val color1 = longPreferencesKey("ambient_color_1")
         val color2 = longPreferencesKey("ambient_color_2")
         val color3 = longPreferencesKey("ambient_color_3")
+        val ambientColorIndex = intPreferencesKey("ambient_color_index")
         val isRunning = booleanPreferencesKey("standby_running")
         val hasSeenManualStartNotice = booleanPreferencesKey("seen_manual_start_notice")
     }

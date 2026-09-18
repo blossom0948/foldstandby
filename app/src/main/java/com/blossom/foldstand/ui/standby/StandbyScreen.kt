@@ -78,6 +78,7 @@ import com.blossom.foldstand.domain.DualScreenStatus
 import com.blossom.foldstand.domain.FoldPosture
 import com.blossom.foldstand.domain.StandbySettings
 import com.blossom.foldstand.domain.StandbyPage
+import com.blossom.foldstand.domain.NightModeOption
 import com.blossom.foldstand.domain.StandbyUiState
 import com.blossom.foldstand.domain.readableName
 import com.blossom.foldstand.fold.FoldLayoutCalculator
@@ -105,8 +106,15 @@ fun StandbyScreen(
     var interactionNonce by remember { mutableLongStateOf(0L) }
     var isDimmed by remember { mutableStateOf(false) }
     var dragTotal by remember { mutableStateOf(Offset.Zero) }
-    val isNight = uiState.settings.nightMode && LocalTime.now().hour >= 22 ||
-        uiState.settings.nightMode && LocalTime.now().hour < 7
+    val ambientLux by rememberAmbientLux(uiState.settings.nightMode == NightModeOption.Auto)
+    val darkEnvironment = ambientLux?.let { it < 12f }
+        ?: (LocalTime.now().hour >= 22 || LocalTime.now().hour < 7)
+    val redNightMode = when (uiState.settings.nightMode) {
+        NightModeOption.On -> true
+        NightModeOption.Off -> false
+        NightModeOption.Auto -> darkEnvironment
+    }
+    val nightBrightnessFactor = if (redNightMode) 0.52f else 1f
 
     fun recordInteraction() {
         interactionNonce++
@@ -125,7 +133,7 @@ fun StandbyScreen(
         label = "automatic brightness dimming",
     )
     StandbyWindowEffects(
-        brightness = uiState.settings.brightness * brightnessFactor,
+        brightness = uiState.settings.brightness * brightnessFactor * nightBrightnessFactor,
         keepScreenOn = uiState.settings.keepScreenOn,
     )
 
@@ -199,6 +207,7 @@ fun StandbyScreen(
                 AmbientPane(
                     preset = uiState.settings.ambientPreset,
                     colorValues = uiState.settings.customColors,
+                    primaryColorIndex = uiState.settings.ambientColorIndex,
                     powerSaving = uiState.settings.powerSavingAnimation,
                 )
             } else {
@@ -210,12 +219,14 @@ fun StandbyScreen(
                             settings = uiState.settings,
                             battery = uiState.battery,
                             burnInOffset = burnInOffset,
+                            nightTint = redNightMode,
                         )
                     },
                     ambient = {
                         AmbientPane(
                             preset = uiState.settings.ambientPreset,
                             colorValues = uiState.settings.customColors,
+                            primaryColorIndex = uiState.settings.ambientColorIndex,
                             powerSaving = uiState.settings.powerSavingAnimation,
                         )
                     },
@@ -223,7 +234,7 @@ fun StandbyScreen(
             }
         }
 
-        if (isNight) {
+        if (redNightMode) {
             Box(
                 modifier = Modifier.fillMaxSize().background(Color(0x2BFF3030)),
             )
@@ -380,12 +391,15 @@ private fun QuickSettingsSheet(
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             uiState.settings.customColors.take(3).forEachIndexed { index, value ->
-                Box(
+                Surface(
+                    onClick = { onSettingsChange { it.copy(ambientColorIndex = index) } },
                     modifier = Modifier
                         .size(48.dp)
-                        .background(Color(value), CircleShape)
                         .semantics { contentDescription = "무드등 색상 ${index + 1}" },
-                )
+                    shape = CircleShape,
+                    color = Color(value),
+                    tonalElevation = if (index == uiState.settings.ambientColorIndex) 5.dp else 0.dp,
+                ) {}
             }
             Spacer(Modifier.weight(1f))
             Button(onClick = onExit) {
