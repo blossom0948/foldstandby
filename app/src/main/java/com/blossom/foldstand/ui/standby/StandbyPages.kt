@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import com.blossom.foldstand.BuildConfig
 import com.blossom.foldstand.data.CalendarRepository
 import com.blossom.foldstand.data.NotificationRepository
 import com.blossom.foldstand.domain.CalendarEvent
@@ -79,7 +80,7 @@ fun StandbyWidgetsPane(
 ) {
     val context = LocalContext.current
     val events by rememberUpcomingEvents(context, calendarPermissionGranted)
-    val notifications by rememberNotifications(context)
+    val notifications by rememberNotifications(context, BuildConfig.NOTIFICATION_ACCESS_AVAILABLE)
     Column(
         modifier = modifier.fillMaxSize().padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -94,6 +95,7 @@ fun StandbyWidgetsPane(
             )
             NotificationWidgetCard(
                 notifications = notifications,
+                available = BuildConfig.NOTIFICATION_ACCESS_AVAILABLE,
                 onOpenSettings = onOpenNotificationSettings,
                 modifier = Modifier.weight(1f),
             )
@@ -152,7 +154,7 @@ fun NotificationsPage(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val notifications by rememberNotifications(context)
+    val notifications by rememberNotifications(context, BuildConfig.NOTIFICATION_ACCESS_AVAILABLE)
     Column(
         modifier = modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -161,7 +163,9 @@ fun NotificationsPage(
             Icon(Icons.Default.Notifications, contentDescription = null, tint = Color(0xFFE66B6B))
             Text("알림", modifier = Modifier.padding(start = 12.dp), fontSize = 30.sp, fontWeight = FontWeight.Light)
         }
-        if (notifications.isEmpty()) {
+        if (!BuildConfig.NOTIFICATION_ACCESS_AVAILABLE) {
+            NotificationUnavailableCard()
+        } else if (notifications.isEmpty()) {
             PermissionCard(
                 icon = Icons.Default.Security,
                 title = "알림 접근을 켜면 최근 알림을 보여줍니다",
@@ -213,6 +217,7 @@ private fun CalendarWidgetCard(
 @Composable
 private fun NotificationWidgetCard(
     notifications: List<NotificationItem>,
+    available: Boolean,
     onOpenSettings: () -> Unit,
     modifier: Modifier,
 ) {
@@ -222,8 +227,10 @@ private fun NotificationWidgetCard(
                 Icon(Icons.Default.Notifications, contentDescription = null, tint = Color(0xFF8AA9FF))
                 Text("알림", modifier = Modifier.padding(start = 8.dp), color = SecondaryText)
             }
-            Text("${notifications.size}", fontSize = 62.sp, fontWeight = FontWeight.Light)
-            if (notifications.isEmpty()) {
+            Text(if (available) "${notifications.size}" else "—", fontSize = 62.sp, fontWeight = FontWeight.Light)
+            if (!available) {
+                Text("직접 설치본에서는 알림 접근 기능을 제외했습니다.", color = SecondaryText, fontSize = 13.sp)
+            } else if (notifications.isEmpty()) {
                 Text("알림 접근을 허용하면 최근 알림을 보여줍니다.", color = SecondaryText, fontSize = 13.sp)
                 OutlinedButton(onClick = onOpenSettings) { Text("설정 열기") }
             } else {
@@ -232,6 +239,20 @@ private fun NotificationWidgetCard(
                     Text(item.text, maxLines = 1, overflow = TextOverflow.Ellipsis, color = SecondaryText, fontSize = 12.sp)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun NotificationUnavailableCard() {
+    Surface(shape = CardShape, color = CardColor, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(Icons.Default.Security, contentDescription = null, tint = Color(0xFFE66B6B))
+            Text("알림 기능은 전체 기능본에서 사용할 수 있습니다", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "브라우저 직접 설치본은 Google Play 프로텍트 차단을 피하기 위해 다른 앱의 알림에 접근하지 않습니다.",
+                color = SecondaryText,
+            )
         }
     }
 }
@@ -328,10 +349,19 @@ private fun rememberUpcomingEvents(context: Context, permissionGranted: Boolean)
 }
 
 @Composable
-private fun rememberNotifications(context: Context): androidx.compose.runtime.State<List<NotificationItem>> {
-    val state = remember { mutableStateOf(NotificationRepository.read(context)) }
+private fun rememberNotifications(
+    context: Context,
+    enabled: Boolean,
+): androidx.compose.runtime.State<List<NotificationItem>> {
+    val state = remember(enabled) {
+        mutableStateOf(if (enabled) NotificationRepository.read(context) else emptyList())
+    }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(lifecycle) {
+    LaunchedEffect(enabled, lifecycle) {
+        if (!enabled) {
+            state.value = emptyList()
+            return@LaunchedEffect
+        }
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
                 state.value = withContext(Dispatchers.IO) { NotificationRepository.read(context) }

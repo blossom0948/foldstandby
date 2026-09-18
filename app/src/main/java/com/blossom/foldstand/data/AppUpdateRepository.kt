@@ -103,14 +103,17 @@ class AppUpdateRepository(private val context: Context) {
                 val version = json.optString("tag_name").removePrefix("v")
                 if (!isNewer(version, BuildConfig.VERSION_NAME)) return@withContext null
                 val assets = json.optJSONArray("assets") ?: return@withContext null
-                val apk = (0 until assets.length())
+                val apkAssets = (0 until assets.length())
                     .asSequence()
                     .map { assets.getJSONObject(it) }
-                    .firstOrNull {
+                    .filter {
                         it.optString("name").endsWith(".apk", ignoreCase = true) &&
                             it.optString("browser_download_url").isNotBlank()
                     }
-                    ?: return@withContext null
+                    .toList()
+                val apk = apkAssets.firstOrNull {
+                    it.optString("name") == BuildConfig.UPDATE_ASSET_NAME
+                } ?: apkAssets.firstOrNull() ?: return@withContext null
                 UpdateInfo(
                     versionName = version,
                     downloadUrl = apk.optString("browser_download_url"),

@@ -11,7 +11,7 @@ Galaxy Z Fold를 반쯤 접어 탁자에 두었을 때 시계와 무드등으로
 - Apple StandBy에서 영감을 받은 큰 저휘도 시계, 날짜·배터리 표시와 켬/끔/자동 야간 모드
 - 단색/그라데이션/오로라 무드등과 세 가지 사용자 색상, 기본 엠비언트 색상 선택
 - 좌우 스와이프 시계 → 위젯 → 달력 → 알림 페이지, 상하 스와이프 무드등 변경
-- 둥근 위젯 카드에 실제 기기 캘린더 일정과 최근 알림 표시
+- 둥근 위젯 카드에 실제 기기 캘린더 일정과 최근 알림 표시(전체 기능본)
 - 탭 조작 패널, 길게 눌러 빠른 설정, 2단계 뒤로가기 종료
 - StandBy에서만 적용되는 immersive UI, 앱 내부 밝기, `FLAG_KEEP_SCREEN_ON`
 - 자동 어둡게, 15/30fps 애니메이션, 90초 주기 번인 방지 이동, 조도센서 기반 자동 야간 모드
@@ -32,28 +32,34 @@ Galaxy Z Fold를 반쯤 접어 탁자에 두었을 때 시계와 무드등으로
 
 Android Studio에서 이 폴더를 열거나 터미널에서 다음을 실행합니다.
 
+직접 설치본은 브라우저 다운로드를 막는 Play 프로텍트의 알림 접근 차단을 피하기 위해 다른 앱의 알림 리스너 서비스를 포함하지 않습니다. 시계·무드등·캘린더·업데이트는 그대로 사용할 수 있습니다. 알림 접근까지 필요하면 전체 기능본을 ADB나 Play 스토어 배포로 설치합니다.
+
 ```bash
-./gradlew assembleDebug
+./gradlew assembleDirectDebug
+./gradlew assembleFullDebug
 ```
 
 생성된 설치 파일:
 
 ```text
-app/build/outputs/apk/debug/app-debug.apk
+app/build/outputs/apk/direct/debug/app-direct-debug.apk  # 브라우저 직접 설치용
+app/build/outputs/apk/full/debug/app-full-debug.apk      # 알림 접근 포함
 ```
 
 이 저장소에서 검증한 명령:
 
 ```bash
-./gradlew testDebugUnitTest assembleDebug
-./gradlew lintDebug assembleDebugAndroidTest
+./gradlew testDirectDebugUnitTest testFullDebugUnitTest assembleDirectDebug assembleFullDebug
+./gradlew lintDirectDebug lintFullDebug
 ```
 
 단위 테스트는 폴드 레이아웃 5종, 설정 기본값/영속화, 배터리 경계값, 듀얼 화면 상태 매핑을 포함합니다. UI 테스트 APK에는 미충전 상태에서도 시작 버튼이 활성화되는 검사가 포함됩니다.
 
 ## 앱 안에서 업데이트
 
-앱은 `https://api.github.com/repos/blossom0948/foldstandby/releases/latest`를 확인합니다. 새 Release에 APK asset이 있으면 홈 화면에 업데이트 카드가 나타나고, HTTPS 리다이렉트 확인·임시 파일 저장·재시도·파일 크기 검증을 거친 뒤 다운로드 후 Android 설치 화면을 엽니다. Android 8 이상에서는 최초 1회 FoldStand의 **알 수 없는 앱 설치 허용**이 필요합니다.
+앱은 `https://api.github.com/repos/blossom0948/foldstandby/releases/latest`를 확인합니다. 새 Release에 배포판에 맞는 APK asset이 있으면 홈 화면에 업데이트 카드가 나타나고, HTTPS 리다이렉트 확인·임시 파일 저장·재시도·파일 크기 검증을 거친 뒤 다운로드 후 Android 설치 화면을 엽니다. Android 8 이상에서는 최초 1회 FoldStand의 **알 수 없는 앱 설치 허용**이 필요합니다.
+
+현재 Release에는 `foldstand-direct.apk`(직접 설치본)와 `foldstand-full.apk`(알림 접근 포함)가 함께 제공됩니다. 브라우저에서 설치가 차단되면 직접 설치본을 사용하고, 전체 기능본은 `adb install -r foldstand-full.apk` 또는 Play 스토어 배포 경로를 사용합니다.
 
 현재 배포 방식은 GitHub Release APK입니다. Google Play에 게시하게 되면 Play In-App Updates로 교체할 수 있지만, GitHub에서 직접 설치한 앱에는 Play Core 업데이트가 적용되지 않으므로 현재 방식이 이 프로젝트에 맞는 업데이트 경로입니다.
 
@@ -64,10 +70,10 @@ app/build/outputs/apk/debug/app-debug.apk
 3. 프로젝트 루트에서 다음을 실행합니다.
 
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/direct/debug/app-direct-debug.apk
 ```
 
-또는 `app-debug.apk`를 휴대폰으로 복사해 파일 앱에서 열 수 있습니다. 이 경우 Android가 요청하면 해당 파일 앱의 **알 수 없는 앱 설치**를 일시적으로 허용합니다.
+또는 `app-direct-debug.apk`를 휴대폰으로 복사해 파일 앱에서 열 수 있습니다. 이 경우 Android가 요청하면 해당 파일 앱의 **알 수 없는 앱 설치**를 일시적으로 허용합니다. 알림까지 필요하면 전체 기능본을 ADB로 설치하세요.
 
 ## 사용법
 
@@ -95,7 +101,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - 15분 이상 실행했을 때 발열, 번인 방지 이동, 배터리 소모
 - TalkBack 및 큰 글꼴 배율에서 핵심 조작 접근성
 - capability 지원 기기의 듀얼 화면 승인/시작/종료/실패 fallback
-- 캘린더 권한 허용/거부, 알림 접근 허용/거부, GitHub Release 업데이트 다운로드·설치
+- 캘린더 권한 허용/거부, 전체 기능본의 알림 접근 허용/거부, GitHub Release 업데이트 다운로드·설치
 - 설정에서 야간 모드 켬/끔/자동 전환, 자동 모드에서 조도센서에 따른 밝기·붉은 글자 변화
 
 ## 프로젝트 구조

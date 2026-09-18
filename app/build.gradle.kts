@@ -11,11 +11,25 @@ android {
         applicationId = "com.blossom.foldstand"
         minSdk = 26
         targetSdk = 37
-        versionCode = 4
-        versionName = "1.2.1"
+        versionCode = 5
+        versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("direct") {
+            dimension = "distribution"
+            buildConfigField("Boolean", "NOTIFICATION_ACCESS_AVAILABLE", "false")
+            buildConfigField("String", "UPDATE_ASSET_NAME", "\"foldstand-direct.apk\"")
+        }
+        create("full") {
+            dimension = "distribution"
+            buildConfigField("Boolean", "NOTIFICATION_ACCESS_AVAILABLE", "true")
+            buildConfigField("String", "UPDATE_ASSET_NAME", "\"foldstand-full.apk\"")
+        }
     }
 
     buildTypes {
