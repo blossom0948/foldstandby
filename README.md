@@ -59,7 +59,7 @@ app/build/outputs/apk/full/debug/app-full-debug.apk      # 알림 접근 포함
 
 앱은 `https://api.github.com/repos/blossom0948/foldstandby/releases/latest`를 확인합니다. 새 Release에 배포판에 맞는 APK asset이 있으면 홈 화면에 업데이트 카드가 나타나고, HTTPS 리다이렉트 확인·임시 파일 저장·재시도·파일 크기 검증을 거친 뒤 다운로드 후 Android 설치 화면을 엽니다. Android 8 이상에서는 최초 1회 FoldStand의 **알 수 없는 앱 설치 허용**이 필요합니다.
 
-현재 Release에는 `foldstand-direct.apk`(직접 설치본)와 `foldstand-full.apk`(알림 접근 포함)가 함께 제공됩니다. 브라우저에서 설치가 차단되면 직접 설치본을 사용하고, 전체 기능본은 `adb install -r foldstand-full.apk` 또는 Play 스토어 배포 경로를 사용합니다.
+현재 Release에는 `foldstand-safe.apk`(직접 설치본)와 `foldstand-full.apk`(알림 접근 포함)가 함께 제공됩니다. 브라우저에서 설치가 차단되면 직접 설치본을 사용하고, 전체 기능본은 `adb install -r foldstand-full.apk` 또는 Play 스토어 배포 경로를 사용합니다.
 
 현재 배포 방식은 GitHub Release APK입니다. Google Play에 게시하게 되면 Play In-App Updates로 교체할 수 있지만, GitHub에서 직접 설치한 앱에는 Play Core 업데이트가 적용되지 않으므로 현재 방식이 이 프로젝트에 맞는 업데이트 경로입니다.
 

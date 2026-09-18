@@ -11,8 +11,8 @@ android {
         applicationId = "com.blossom.foldstand"
         minSdk = 26
         targetSdk = 37
-        versionCode = 5
-        versionName = "1.3.0"
+        versionCode = 6
+        versionName = "1.3.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -23,7 +23,7 @@ android {
         create("direct") {
             dimension = "distribution"
             buildConfigField("Boolean", "NOTIFICATION_ACCESS_AVAILABLE", "false")
-            buildConfigField("String", "UPDATE_ASSET_NAME", "\"foldstand-direct.apk\"")
+            buildConfigField("String", "UPDATE_ASSET_NAME", "\"foldstand-safe.apk\"")
         }
         create("full") {
             dimension = "distribution"
