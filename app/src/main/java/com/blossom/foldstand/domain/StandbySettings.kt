@@ -18,6 +18,7 @@ data class StandbySettings(
     val keepScreenOn: Boolean = true,
     val burnInProtection: Boolean = true,
     val powerSavingAnimation: Boolean = true,
+    val nightMode: Boolean = true,
     val autoDim: AutoDimOption = AutoDimOption.FifteenMinutes,
     val reverseVerticalPanes: Boolean = false,
     val suggestWhenCharging: Boolean = false,

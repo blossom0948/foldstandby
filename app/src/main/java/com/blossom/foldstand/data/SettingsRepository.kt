@@ -46,6 +46,7 @@ class SettingsRepository(
         keepScreenOn = preferences[Keys.keepScreenOn] ?: true,
         burnInProtection = preferences[Keys.burnInProtection] ?: true,
         powerSavingAnimation = preferences[Keys.powerSavingAnimation] ?: true,
+        nightMode = preferences[Keys.nightMode] ?: true,
         autoDim = enumOrDefault(preferences[Keys.autoDim], AutoDimOption.FifteenMinutes),
         reverseVerticalPanes = preferences[Keys.reverseVerticalPanes] ?: false,
         suggestWhenCharging = preferences[Keys.suggestWhenCharging] ?: false,
@@ -70,6 +71,7 @@ class SettingsRepository(
         preferences[Keys.keepScreenOn] = value.keepScreenOn
         preferences[Keys.burnInProtection] = value.burnInProtection
         preferences[Keys.powerSavingAnimation] = value.powerSavingAnimation
+        preferences[Keys.nightMode] = value.nightMode
         preferences[Keys.autoDim] = value.autoDim.name
         preferences[Keys.reverseVerticalPanes] = value.reverseVerticalPanes
         preferences[Keys.suggestWhenCharging] = value.suggestWhenCharging
@@ -95,6 +97,7 @@ class SettingsRepository(
         val keepScreenOn = booleanPreferencesKey("keep_screen_on")
         val burnInProtection = booleanPreferencesKey("burn_in_protection")
         val powerSavingAnimation = booleanPreferencesKey("power_saving_animation")
+        val nightMode = booleanPreferencesKey("night_mode")
         val autoDim = stringPreferencesKey("auto_dim")
         val reverseVerticalPanes = booleanPreferencesKey("reverse_vertical_panes")
         val suggestWhenCharging = booleanPreferencesKey("suggest_when_charging")

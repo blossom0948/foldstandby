@@ -58,6 +58,7 @@ import com.blossom.foldstand.domain.DualScreenStatus
 import com.blossom.foldstand.domain.FoldPosture
 import com.blossom.foldstand.domain.StandbyUiState
 import com.blossom.foldstand.domain.readableName
+import com.blossom.foldstand.data.UpdateState
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -69,6 +70,9 @@ fun HomeScreen(
     onStartDualScreen: () -> Unit,
     onDismissManualNotice: () -> Unit,
     modifier: Modifier = Modifier,
+    updateState: UpdateState = UpdateState.Idle,
+    onDownloadUpdate: () -> Unit = {},
+    onInstallUpdate: (java.io.File) -> Unit = {},
 ) {
     LazyColumn(
         modifier = modifier
@@ -98,6 +102,17 @@ fun HomeScreen(
 
         item {
             StandbyPreview(uiState, Modifier.fillMaxWidth().widthIn(max = 720.dp))
+        }
+
+        if (updateState !is UpdateState.Idle && updateState !is UpdateState.UpToDate && updateState !is UpdateState.Checking) {
+            item {
+                UpdateCard(
+                    state = updateState,
+                    onDownload = onDownloadUpdate,
+                    onInstall = onInstallUpdate,
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 720.dp),
+                )
+            }
         }
 
         if (!uiState.settings.hasSeenManualStartNotice) {
@@ -208,6 +223,49 @@ fun HomeScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 8.dp),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpdateCard(
+    state: UpdateState,
+    onDownload: () -> Unit,
+    onInstall: (java.io.File) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val info = when (state) {
+        is UpdateState.Available -> state.info
+        is UpdateState.Downloading -> state.info
+        is UpdateState.Ready -> state.info
+        else -> null
+    }
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("새 버전${info?.let { " ${it.versionName}" } ?: ""}", style = MaterialTheme.typography.titleMedium)
+            when (state) {
+                is UpdateState.Available -> {
+                    Text("GitHub Release에서 업데이트 APK를 내려받을 수 있습니다.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Button(onClick = onDownload) { Text("업데이트 다운로드") }
+                }
+                is UpdateState.Downloading -> {
+                    Text("다운로드 중 ${state.progress}%", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    androidx.compose.material3.LinearProgressIndicator(
+                        progress = { state.progress / 100f },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                is UpdateState.Ready -> {
+                    Text("다운로드가 완료되었습니다. 설치를 누르면 Android 설치 화면이 열립니다.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Button(onClick = { onInstall(state.file) }) { Text("업데이트 설치") }
+                }
+                is UpdateState.Error -> Text(state.message, color = MaterialTheme.colorScheme.error)
+                else -> Unit
             }
         }
     }

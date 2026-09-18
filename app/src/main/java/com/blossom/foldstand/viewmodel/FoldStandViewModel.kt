@@ -11,7 +11,10 @@ import com.blossom.foldstand.domain.ClockStyle
 import com.blossom.foldstand.domain.DualScreenStatus
 import com.blossom.foldstand.domain.FoldPosture
 import com.blossom.foldstand.domain.StandbySettings
+import com.blossom.foldstand.domain.StandbyPage
 import com.blossom.foldstand.domain.StandbyUiState
+import com.blossom.foldstand.data.AppUpdateRepository
+import com.blossom.foldstand.data.UpdateState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,34 +26,40 @@ import kotlinx.coroutines.launch
 class FoldStandViewModel(
     private val settingsRepository: SettingsRepository,
     batteryStateObserver: BatteryStateObserver,
+    private val appUpdateRepository: AppUpdateRepository,
 ) : ViewModel() {
     private val foldPosture = MutableStateFlow<FoldPosture>(FoldPosture.Unknown)
     private val dualScreenStatus = MutableStateFlow<DualScreenStatus>(DualScreenStatus.Checking)
     private val loaded = MutableStateFlow(false)
+    private val page = MutableStateFlow(StandbyPage.Clock)
 
     private val settings = settingsRepository.settings
         .onEach { loaded.value = true }
     private val battery = batteryStateObserver.state
 
-    val uiState = combine(
+    private val baseUiState = combine(
         settings,
         battery,
         foldPosture,
         dualScreenStatus,
-        loaded,
-    ) { currentSettings, currentBattery, posture, dualStatus, isLoaded ->
+    ) { currentSettings, currentBattery, posture, dualStatus ->
         StandbyUiState(
             settings = currentSettings,
             battery = currentBattery,
             foldPosture = posture,
             dualScreenStatus = dualStatus,
-            isLoaded = isLoaded,
         )
+    }
+
+    val uiState = combine(baseUiState, page, loaded) { base, currentPage, isLoaded ->
+        base.copy(page = currentPage, isLoaded = isLoaded)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = StandbyUiState(),
     )
+
+    val updateState = appUpdateRepository.state
 
     fun observeDualScreenStatus(status: Flow<DualScreenStatus>) {
         viewModelScope.launch { status.collect { dualScreenStatus.value = it } }
@@ -60,7 +69,10 @@ class FoldStandViewModel(
         foldPosture.value = posture
     }
 
-    fun startStandby() = update { it.copy(isRunning = true, hasSeenManualStartNotice = true) }
+    fun startStandby() {
+        page.value = StandbyPage.Clock
+        update { it.copy(isRunning = true, hasSeenManualStartNotice = true) }
+    }
 
     fun stopStandby() = update { it.copy(isRunning = false) }
 
@@ -78,6 +90,14 @@ class FoldStandViewModel(
         it.copy(ambientPreset = it.ambientPreset.next(direction))
     }
 
+    fun movePage(direction: Int) {
+        page.value = page.value.next(direction)
+    }
+
+    fun checkForUpdates() = appUpdateRepository.checkForLatest()
+
+    fun downloadUpdate() = appUpdateRepository.downloadAvailable()
+
     fun updateSettings(transform: (StandbySettings) -> StandbySettings) = update(transform)
 
     private fun update(transform: (StandbySettings) -> StandbySettings) {
@@ -88,7 +108,7 @@ class FoldStandViewModel(
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(FoldStandViewModel::class.java))
-            return FoldStandViewModel(app.settingsRepository, app.batteryStateObserver) as T
+            return FoldStandViewModel(app.settingsRepository, app.batteryStateObserver, app.appUpdateRepository) as T
         }
     }
 }

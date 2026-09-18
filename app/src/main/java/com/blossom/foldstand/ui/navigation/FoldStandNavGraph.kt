@@ -30,8 +30,13 @@ fun FoldStandNavGraph(
     viewModel: FoldStandViewModel,
     onStartDualScreen: () -> Unit,
     onStopDualScreen: () -> Unit,
+    calendarPermissionGranted: Boolean,
+    onRequestCalendarPermission: () -> Unit,
+    onOpenNotificationSettings: () -> Unit,
+    onInstallUpdate: (java.io.File) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     if (!uiState.isLoaded) {
         Box(
             modifier = Modifier.fillMaxSize().background(Color.Black),
@@ -46,6 +51,7 @@ fun FoldStandNavGraph(
         composable(Routes.Home) {
             HomeScreen(
                 uiState = uiState,
+                updateState = updateState,
                 onStartStandby = {
                     viewModel.startStandby()
                     navController.navigate(Routes.Standby) { launchSingleTop = true }
@@ -57,15 +63,20 @@ fun FoldStandNavGraph(
                     navController.navigate(Routes.Standby) { launchSingleTop = true }
                 },
                 onDismissManualNotice = viewModel::dismissManualStartNotice,
+                onDownloadUpdate = viewModel::downloadUpdate,
+                onInstallUpdate = onInstallUpdate,
             )
         }
         composable(Routes.Standby) {
             StandbyScreen(
                 uiState = uiState,
-                onCycleClockStyle = viewModel::cycleClockStyle,
+                onPageChange = viewModel::movePage,
                 onCycleAmbientPreset = viewModel::cycleAmbientPreset,
                 onSettingsChange = viewModel::updateSettings,
                 onOpenSettings = { navController.navigate(Routes.Settings) },
+                calendarPermissionGranted = calendarPermissionGranted,
+                onRequestCalendarPermission = onRequestCalendarPermission,
+                onOpenNotificationSettings = onOpenNotificationSettings,
                 onExit = {
                     onStopDualScreen()
                     viewModel.stopStandby()

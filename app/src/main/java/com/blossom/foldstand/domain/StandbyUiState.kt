@@ -28,6 +28,7 @@ data class StandbyUiState(
     val battery: BatteryState = BatteryState(),
     val foldPosture: FoldPosture = FoldPosture.Unknown,
     val dualScreenStatus: DualScreenStatus = DualScreenStatus.Checking,
+    val page: StandbyPage = StandbyPage.Clock,
     val isLoaded: Boolean = false,
 ) {
     val isRunning: Boolean get() = settings.isRunning

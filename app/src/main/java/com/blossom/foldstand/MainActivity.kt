@@ -1,17 +1,27 @@
 package com.blossom.foldstand
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.collectAsState
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -46,6 +56,15 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
+            var calendarPermissionGranted by remember {
+                mutableStateOf(
+                    ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALENDAR) ==
+                        PackageManager.PERMISSION_GRANTED,
+                )
+            }
+            val calendarPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission(),
+            ) { granted -> calendarPermissionGranted = granted }
             FoldStandTheme {
                 FoldStandNavGraph(
                     viewModel = viewModel,
@@ -63,9 +82,16 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     onStopDualScreen = dualScreenController::close,
+                    calendarPermissionGranted = calendarPermissionGranted,
+                    onRequestCalendarPermission = { calendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR) },
+                    onOpenNotificationSettings = {
+                        startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    },
+                    onInstallUpdate = { file -> (application as FoldStandApp).appUpdateRepository.install(this, file) },
                 )
             }
         }
+        viewModel.checkForUpdates()
     }
 
     override fun onStop() {

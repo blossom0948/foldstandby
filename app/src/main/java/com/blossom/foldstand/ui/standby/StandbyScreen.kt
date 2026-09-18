@@ -77,9 +77,11 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.blossom.foldstand.domain.DualScreenStatus
 import com.blossom.foldstand.domain.FoldPosture
 import com.blossom.foldstand.domain.StandbySettings
+import com.blossom.foldstand.domain.StandbyPage
 import com.blossom.foldstand.domain.StandbyUiState
 import com.blossom.foldstand.domain.readableName
 import com.blossom.foldstand.fold.FoldLayoutCalculator
+import java.time.LocalTime
 import kotlin.math.abs
 import kotlinx.coroutines.delay
 
@@ -87,10 +89,13 @@ import kotlinx.coroutines.delay
 @Composable
 fun StandbyScreen(
     uiState: StandbyUiState,
-    onCycleClockStyle: (Int) -> Unit,
+    onPageChange: (Int) -> Unit,
     onCycleAmbientPreset: (Int) -> Unit,
     onSettingsChange: ((StandbySettings) -> StandbySettings) -> Unit,
     onOpenSettings: () -> Unit,
+    calendarPermissionGranted: Boolean,
+    onRequestCalendarPermission: () -> Unit,
+    onOpenNotificationSettings: () -> Unit,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -100,6 +105,8 @@ fun StandbyScreen(
     var interactionNonce by remember { mutableLongStateOf(0L) }
     var isDimmed by remember { mutableStateOf(false) }
     var dragTotal by remember { mutableStateOf(Offset.Zero) }
+    val isNight = uiState.settings.nightMode && LocalTime.now().hour >= 22 ||
+        uiState.settings.nightMode && LocalTime.now().hour < 7
 
     fun recordInteraction() {
         interactionNonce++
@@ -150,7 +157,7 @@ fun StandbyScreen(
                     val threshold = 64.dp.toPx()
                     when {
                         abs(dragTotal.x) > abs(dragTotal.y) && abs(dragTotal.x) > threshold ->
-                            onCycleClockStyle(if (dragTotal.x < 0) 1 else -1)
+                            onPageChange(if (dragTotal.x < 0) 1 else -1)
                         abs(dragTotal.y) > threshold ->
                             onCycleAmbientPreset(if (dragTotal.y < 0) 1 else -1)
                     }
@@ -172,7 +179,23 @@ fun StandbyScreen(
             label = "fold posture transition",
             modifier = Modifier.fillMaxSize(),
         ) { (posture, reverse) ->
-            if (uiState.dualScreenStatus == DualScreenStatus.Active) {
+            if (uiState.page != StandbyPage.Clock) {
+                when (uiState.page) {
+                    StandbyPage.Widgets -> StandbyWidgetsPane(
+                        calendarPermissionGranted = calendarPermissionGranted,
+                        onRequestCalendarPermission = onRequestCalendarPermission,
+                        onOpenNotificationSettings = onOpenNotificationSettings,
+                    )
+                    StandbyPage.Calendar -> CalendarPage(
+                        permissionGranted = calendarPermissionGranted,
+                        onRequestPermission = onRequestCalendarPermission,
+                    )
+                    StandbyPage.Notifications -> NotificationsPage(
+                        onOpenNotificationSettings = onOpenNotificationSettings,
+                    )
+                    StandbyPage.Clock -> Unit
+                }
+            } else if (uiState.dualScreenStatus == DualScreenStatus.Active) {
                 AmbientPane(
                     preset = uiState.settings.ambientPreset,
                     colorValues = uiState.settings.customColors,
@@ -200,6 +223,12 @@ fun StandbyScreen(
             }
         }
 
+        if (isNight) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color(0x2BFF3030)),
+            )
+        }
+
         AnimatedVisibility(
             visible = controlsVisible,
             modifier = Modifier.align(Alignment.TopCenter),
@@ -213,13 +242,15 @@ fun StandbyScreen(
                     text = if (uiState.dualScreenStatus == DualScreenStatus.Active) {
                         "듀얼 화면 · ${uiState.settings.ambientPreset.label}"
                     } else {
-                        "${uiState.foldPosture.readableName()} · ${uiState.settings.clockStyle.label} · ${uiState.settings.ambientPreset.label}"
+                        "${uiState.foldPosture.readableName()} · ${uiState.page.label} · ${uiState.settings.ambientPreset.label}"
                     },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
                     style = MaterialTheme.typography.labelLarge,
                 )
             }
         }
+
+        PageIndicator(page = uiState.page, modifier = Modifier.align(Alignment.BottomCenter))
 
         AnimatedVisibility(
             visible = controlsVisible,
@@ -361,6 +392,25 @@ private fun QuickSettingsSheet(
                 Icon(Icons.Default.FullscreenExit, contentDescription = null)
                 Text("스탠바이 종료", modifier = Modifier.padding(start = 8.dp))
             }
+        }
+    }
+}
+
+@Composable
+private fun PageIndicator(page: StandbyPage, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.padding(bottom = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        StandbyPage.entries.forEach { item ->
+            Box(
+                Modifier
+                    .size(if (item == page) 7.dp else 5.dp)
+                    .background(
+                        if (item == page) Color.White.copy(alpha = 0.86f) else Color.White.copy(alpha = 0.28f),
+                        CircleShape,
+                    ),
+            )
         }
     }
 }

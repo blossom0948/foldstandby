@@ -8,14 +8,19 @@ Galaxy Z Fold를 반쯤 접어 탁자에 두었을 때 시계와 무드등으로
 - `FoldingFeature`의 상태, 방향, 실제 `bounds`, occlusion, separating 값을 사용하는 폴더블 자세 감지
 - 가로 힌지: 위 시계/아래 무드등, 세로 힌지: 왼쪽 시계/오른쪽 무드등
 - 펼침 또는 일반 스마트폰: 현재 창 비율에 맞춘 안전한 50:50 대체 레이아웃
-- Digital Bold/Minimal 시계, 12/24시간제, 초·날짜·배터리 선택 표시
+- Apple StandBy에서 영감을 받은 큰 저휘도 시계, 날짜·배터리 표시와 야간 붉은 톤
 - 단색/그라데이션/오로라 무드등과 세 가지 사용자 색상
-- 탭 조작 패널, 좌우/상하 스와이프 스타일 변경, 길게 눌러 빠른 설정, 2단계 뒤로가기 종료
+- 좌우 스와이프 시계 → 위젯 → 달력 → 알림 페이지, 상하 스와이프 무드등 변경
+- 둥근 위젯 카드에 실제 기기 캘린더 일정과 최근 알림 표시
+- 탭 조작 패널, 길게 눌러 빠른 설정, 2단계 뒤로가기 종료
 - StandBy에서만 적용되는 immersive UI, 앱 내부 밝기, `FLAG_KEEP_SCREEN_ON`
-- 자동 어둡게, 15/30fps 애니메이션, 90초 주기 번인 방지 이동
+- 자동 어둡게, 15/30fps 애니메이션, 90초 주기 번인 방지 이동, 22:00~07:00 야간 모드
 - DataStore를 통한 모든 설정과 실행 상태 영속화
+- GitHub Releases 기반 업데이트 확인·APK 다운로드·Android 설치 화면 연결
 - `WindowAreaController`의 `TYPE_REAR_FACING` + `OPERATION_PRESENT_ON_AREA` capability 기반 듀얼 화면 실험 기능
 - 네트워크, 계정, 위치, 카메라, 마이크, 저장소 권한 없음
+
+캘린더를 처음 열 때만 `READ_CALENDAR`를 요청합니다. 알림은 Android의 알림 접근 설정에서 사용자가 직접 FoldStand를 허용한 경우에만 최근 12개를 기기 안에 보관합니다. 두 권한을 거부해도 시계와 무드등은 정상 실행됩니다.
 
 ## 빌드
 
@@ -45,6 +50,12 @@ app/build/outputs/apk/debug/app-debug.apk
 ```
 
 단위 테스트는 폴드 레이아웃 5종, 설정 기본값/영속화, 배터리 경계값, 듀얼 화면 상태 매핑을 포함합니다. UI 테스트 APK에는 미충전 상태에서도 시작 버튼이 활성화되는 검사가 포함됩니다.
+
+## 앱 안에서 업데이트
+
+앱은 `https://api.github.com/repos/blossom0948/foldstandby/releases/latest`를 확인합니다. 새 Release에 APK asset이 있으면 홈 화면에 업데이트 카드가 나타나고, 다운로드 후 Android 설치 화면을 엽니다. Android 8 이상에서는 최초 1회 FoldStand의 **알 수 없는 앱 설치 허용**이 필요합니다.
+
+현재 배포 방식은 GitHub Release APK입니다. Google Play에 게시하게 되면 Play In-App Updates로 교체할 수 있지만, GitHub에서 직접 설치한 앱에는 Play Core 업데이트가 적용되지 않으므로 현재 방식이 이 프로젝트에 맞는 업데이트 경로입니다.
 
 ## 휴대폰 설치
 
@@ -84,6 +95,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - 15분 이상 실행했을 때 발열, 번인 방지 이동, 배터리 소모
 - TalkBack 및 큰 글꼴 배율에서 핵심 조작 접근성
 - capability 지원 기기의 듀얼 화면 승인/시작/종료/실패 fallback
+- 캘린더 권한 허용/거부, 알림 접근 허용/거부, GitHub Release 업데이트 다운로드·설치
 
 ## 프로젝트 구조
 
