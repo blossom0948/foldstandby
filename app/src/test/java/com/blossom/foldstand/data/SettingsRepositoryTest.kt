@@ -4,6 +4,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.blossom.foldstand.domain.AmbientPreset
 import com.blossom.foldstand.domain.AutoDimOption
 import com.blossom.foldstand.domain.ClockStyle
+import com.blossom.foldstand.domain.NightModeOption
 import com.blossom.foldstand.domain.StandbySettings
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -52,7 +53,9 @@ class SettingsRepositoryTest {
                 showSeconds = true,
                 brightness = 0.55f,
                 autoDim = AutoDimOption.ThirtyMinutes,
+                nightMode = NightModeOption.On,
                 customColors = listOf(0xFF112233, 0xFF445566, 0xFF778899),
+                ambientColorIndex = 2,
                 isRunning = true,
             )
         }
@@ -64,7 +67,9 @@ class SettingsRepositoryTest {
         assertTrue(restored.showSeconds)
         assertEquals(0.55f, restored.brightness)
         assertEquals(AutoDimOption.ThirtyMinutes, restored.autoDim)
+        assertEquals(NightModeOption.On, restored.nightMode)
         assertEquals(listOf(0xFF112233, 0xFF445566, 0xFF778899), restored.customColors)
+        assertEquals(2, restored.ambientColorIndex)
         assertTrue(restored.isRunning)
     }
 }
