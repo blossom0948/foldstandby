@@ -88,14 +88,20 @@ class MainActivity : ComponentActivity() {
                         startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                     },
                     onInstallUpdate = { file -> (application as FoldStandApp).appUpdateRepository.install(this, file) },
+                    onCheckForUpdates = viewModel::checkForUpdates,
+                    onDownloadUpdate = viewModel::downloadUpdate,
                 )
             }
         }
-        viewModel.checkForUpdates()
     }
 
     override fun onStop() {
         if (::dualScreenController.isInitialized) dualScreenController.close()
         super.onStop()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        (application as FoldStandApp).appUpdateRepository.resumePendingInstall(this)
     }
 }

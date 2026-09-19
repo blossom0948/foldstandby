@@ -26,11 +26,11 @@ import kotlin.math.sin
 
 @Composable
 fun AmbientPane(
+    modifier: Modifier = Modifier,
     preset: AmbientPreset,
     colorValues: List<Long>,
     primaryColorIndex: Int = 0,
     powerSaving: Boolean,
-    modifier: Modifier = Modifier,
 ) {
     val colors = remember(colorValues, primaryColorIndex) {
         val safe = if (colorValues.size >= 3) colorValues else DEFAULT_AMBIENT_COLORS
@@ -115,6 +115,58 @@ fun AmbientPane(
                 drawRect(
                     Brush.verticalGradient(
                         listOf(Color.Black.copy(alpha = 0.12f), Color.Black.copy(alpha = 0.38f)),
+                    ),
+                )
+            }
+            AmbientPreset.Sunset -> {
+                val shift = sin(phase * 2f * PI).toFloat() * size.width * 0.12f
+                drawRect(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFF28133F),
+                            colors[0].copy(alpha = 0.88f),
+                            Color(0xFFE27D5F).copy(alpha = 0.82f),
+                            Color(0xFF3B1D3F),
+                        ),
+                        start = Offset(shift, size.height),
+                        end = Offset(size.width - shift, 0f),
+                    ),
+                )
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFFFFC857).copy(alpha = 0.35f), Color.Transparent),
+                        center = Offset(size.width * 0.72f, size.height * 0.28f),
+                        radius = size.minDimension * 0.46f,
+                    ),
+                    radius = size.minDimension * 0.46f,
+                    center = Offset(size.width * 0.72f, size.height * 0.28f),
+                )
+                drawRect(Color.Black.copy(alpha = 0.2f))
+            }
+            AmbientPreset.Candle -> {
+                val angle = phase * 2f * PI
+                val flicker = (0.88f + 0.12f * sin(angle * 3.1f)).toFloat()
+                val center = Offset(
+                    size.width * (0.5f + 0.06f * sin(angle * 1.7f).toFloat()),
+                    size.height * (0.48f + 0.05f * cos(angle * 1.3f).toFloat()),
+                )
+                drawRect(Color(0xFF100804))
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFFFFD27D).copy(alpha = 0.72f * flicker),
+                            Color(0xFFE37B3A).copy(alpha = 0.25f * flicker),
+                            Color.Transparent,
+                        ),
+                        center = center,
+                        radius = size.minDimension * 0.68f,
+                    ),
+                    radius = size.minDimension * 0.68f,
+                    center = center,
+                )
+                drawRect(
+                    Brush.verticalGradient(
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.48f)),
                     ),
                 )
             }

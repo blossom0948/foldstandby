@@ -28,13 +28,17 @@ import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -51,6 +55,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.blossom.foldstand.BuildConfig
+import com.blossom.foldstand.data.UpdateState
 import com.blossom.foldstand.domain.AmbientPreset
 import com.blossom.foldstand.domain.AutoDimOption
 import com.blossom.foldstand.domain.ClockStyle
@@ -58,6 +64,7 @@ import com.blossom.foldstand.domain.DualScreenStatus
 import com.blossom.foldstand.domain.StandbySettings
 import com.blossom.foldstand.domain.NightModeOption
 import com.blossom.foldstand.domain.readableName
+import java.io.File
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,6 +75,10 @@ fun SettingsScreen(
     onSettingsChange: ((StandbySettings) -> StandbySettings) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    updateState: UpdateState = UpdateState.Idle,
+    onCheckForUpdates: () -> Unit = {},
+    onDownloadUpdate: () -> Unit = {},
+    onInstallUpdate: (File) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -235,6 +246,80 @@ fun SettingsScreen(
                     )
                 }
             }
+
+            item {
+                SettingSection("앱 업데이트", Icons.Default.SystemUpdate) {
+                    Text(
+                        "현재 버전 ${BuildConfig.VERSION_NAME}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    UpdateSettingsContent(
+                        state = updateState,
+                        onCheck = onCheckForUpdates,
+                        onDownload = onDownloadUpdate,
+                        onInstall = onInstallUpdate,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpdateSettingsContent(
+    state: UpdateState,
+    onCheck: () -> Unit,
+    onDownload: () -> Unit,
+    onInstall: (File) -> Unit,
+) {
+    Text(
+        "업데이트 확인을 누르면 앱 안에서 APK를 검증·내려받고 Android 설치 화면으로 이어집니다.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    when (state) {
+        UpdateState.Idle -> Button(onClick = onCheck) { Text("업데이트 확인") }
+        UpdateState.Checking -> Row(verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            Text("새 버전을 확인하고 있어요…", modifier = Modifier.padding(start = 10.dp))
+        }
+        UpdateState.UpToDate -> {
+            Text("현재 최신 버전이에요.", color = MaterialTheme.colorScheme.primary)
+            Button(onClick = onCheck) { Text("다시 확인") }
+        }
+        is UpdateState.Available -> {
+            Text("${state.info.versionName} 업데이트가 있어요.", color = MaterialTheme.colorScheme.primary)
+            Button(onClick = onDownload) { Text("앱에서 다운로드") }
+        }
+        is UpdateState.Downloading -> {
+            Text("앱 안에서 APK 다운로드 중 · ${state.progress}%")
+            LinearProgressIndicator(
+                progress = { state.progress / 100f },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        is UpdateState.Ready -> {
+            Text("다운로드가 완료되었습니다. 설치를 누르면 다음 단계로 진행합니다.")
+            Button(onClick = { onInstall(state.file) }) { Text("앱에서 설치") }
+        }
+        is UpdateState.WaitingForInstallPermission -> {
+            Text("FoldStand의 ‘알 수 없는 앱 설치’를 허용하고 돌아온 뒤 다시 설치를 누르세요.")
+            Button(onClick = { onInstall(state.file) }) { Text("설치 다시 시도") }
+        }
+        is UpdateState.Installing -> {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Text("Android 설치 세션을 준비하고 있어요…", modifier = Modifier.padding(start = 10.dp))
+            }
+        }
+        is UpdateState.InstallerOpened -> {
+            Text("Android 설치 화면에서 업데이트를 승인해 주세요.")
+            Button(onClick = { onInstall(state.file) }) { Text("설치 화면 다시 열기") }
+        }
+        is UpdateState.Error -> {
+            Text(state.message, color = MaterialTheme.colorScheme.error)
+            Button(onClick = onCheck) { Text("다시 시도") }
         }
     }
 }

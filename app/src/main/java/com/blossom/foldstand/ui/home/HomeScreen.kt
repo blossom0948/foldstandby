@@ -54,7 +54,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.blossom.foldstand.BuildConfig
 import com.blossom.foldstand.domain.DualScreenStatus
 import com.blossom.foldstand.domain.FoldPosture
 import com.blossom.foldstand.domain.StandbyUiState
@@ -253,6 +252,9 @@ private fun UpdateCard(
         is UpdateState.Available -> state.info
         is UpdateState.Downloading -> state.info
         is UpdateState.Ready -> state.info
+        is UpdateState.WaitingForInstallPermission -> state.info
+        is UpdateState.Installing -> state.info
+        is UpdateState.InstallerOpened -> state.info
         else -> null
     }
     Card(
@@ -265,11 +267,7 @@ private fun UpdateCard(
             when (state) {
                 is UpdateState.Available -> {
                     Text(
-                        if (BuildConfig.CAN_INSTALL_UPDATES) {
-                            "FoldStand 앱 안에서 업데이트 파일을 내려받아 설치할 수 있습니다."
-                        } else {
-                            "업데이트 파일은 앱 안에서 먼저 내려받습니다. 안전 설치본은 Android 보안 정책상 마지막 설치 확인이 필요합니다."
-                        },
+                        "FoldStand 앱 안에서 업데이트 파일을 검증·내려받아 설치할 수 있습니다.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Button(onClick = onDownload) { Text("업데이트 다운로드") }
@@ -283,16 +281,24 @@ private fun UpdateCard(
                 }
                 is UpdateState.Ready -> {
                     Text(
-                        if (BuildConfig.CAN_INSTALL_UPDATES) {
-                            "다운로드가 완료되었습니다. GitHub 브라우저를 열지 않고 Android 설치 화면으로 전달합니다."
-                        } else {
-                            "안전 설치본은 APK 설치 권한을 포함하지 않습니다. 다운로드 후 브라우저/파일 앱에서 한 번만 설치를 확인해야 합니다. 앱 안 자동 설치는 전체 기능본에서 사용할 수 있습니다."
-                        },
+                        "다운로드가 완료되었습니다. GitHub 브라우저를 열지 않고 Android 설치 화면으로 전달합니다.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Button(onClick = { onInstall(state.file) }) {
-                        Text(if (BuildConfig.CAN_INSTALL_UPDATES) "업데이트 설치" else "설치 확인 열기")
+                        Text("업데이트 설치")
                     }
+                }
+                is UpdateState.WaitingForInstallPermission -> {
+                    Text("FoldStand의 ‘알 수 없는 앱 설치’를 허용하고 돌아온 뒤 다시 설치를 누르세요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Button(onClick = { onInstall(state.file) }) { Text("설치 다시 시도") }
+                }
+                is UpdateState.Installing -> {
+                    Text("Android 설치 세션을 준비하고 있어요…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+                is UpdateState.InstallerOpened -> {
+                    Text("Android 설치 화면에서 업데이트를 승인해 주세요.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Button(onClick = { onInstall(state.file) }) { Text("설치 화면 다시 열기") }
                 }
                 is UpdateState.Error -> Text(state.message, color = MaterialTheme.colorScheme.error)
                 else -> Unit

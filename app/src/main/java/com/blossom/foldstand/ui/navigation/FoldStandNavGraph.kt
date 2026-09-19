@@ -34,6 +34,8 @@ fun FoldStandNavGraph(
     onRequestCalendarPermission: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onInstallUpdate: (java.io.File) -> Unit,
+    onCheckForUpdates: () -> Unit,
+    onDownloadUpdate: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
@@ -93,6 +95,10 @@ fun FoldStandNavGraph(
                 dualScreenStatus = uiState.dualScreenStatus,
                 onSettingsChange = viewModel::updateSettings,
                 onBack = { navController.popBackStack() },
+                updateState = updateState,
+                onCheckForUpdates = onCheckForUpdates,
+                onDownloadUpdate = onDownloadUpdate,
+                onInstallUpdate = onInstallUpdate,
             )
         }
     }

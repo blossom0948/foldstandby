@@ -7,8 +7,8 @@ android {
     namespace = "com.blossom.foldstand"
     compileSdk = 37
 
-    val configuredVersionName = providers.gradleProperty("foldstandVersionName").orElse("1.4.1")
-    val configuredVersionCode = providers.gradleProperty("foldstandVersionCode").orElse("10401")
+    val configuredVersionName = providers.gradleProperty("foldstandVersionName").orElse("1.5.0")
+    val configuredVersionCode = providers.gradleProperty("foldstandVersionCode").orElse("10500")
 
     defaultConfig {
         applicationId = "com.blossom.foldstand"
@@ -26,7 +26,7 @@ android {
         create("direct") {
             dimension = "distribution"
             buildConfigField("Boolean", "NOTIFICATION_ACCESS_AVAILABLE", "false")
-            buildConfigField("Boolean", "CAN_INSTALL_UPDATES", "false")
+            buildConfigField("Boolean", "CAN_INSTALL_UPDATES", "true")
             buildConfigField("String", "UPDATE_ASSET_NAME", "\"foldstand-safe.apk\"")
         }
         create("full") {

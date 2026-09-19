@@ -52,8 +52,8 @@ class SettingsRepositoryTest {
     @Test fun allImportantSettingsRoundTripThroughDataStore() = runBlocking {
         repository.update {
             it.copy(
-                clockStyle = ClockStyle.Minimal,
-                ambientPreset = AmbientPreset.Gradient,
+                clockStyle = ClockStyle.Analog,
+                ambientPreset = AmbientPreset.Candle,
                 use24Hour = false,
                 showSeconds = true,
                 brightness = 0.55f,
@@ -66,8 +66,8 @@ class SettingsRepositoryTest {
         }
 
         val restored = repository.settings.first()
-        assertEquals(ClockStyle.Minimal, restored.clockStyle)
-        assertEquals(AmbientPreset.Gradient, restored.ambientPreset)
+        assertEquals(ClockStyle.Analog, restored.clockStyle)
+        assertEquals(AmbientPreset.Candle, restored.ambientPreset)
         assertFalse(restored.use24Hour)
         assertTrue(restored.showSeconds)
         assertEquals(0.55f, restored.brightness)

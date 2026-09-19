@@ -9,14 +9,15 @@ Galaxy Z Fold를 반쯤 접어 탁자에 두었을 때 시계와 무드등으로
 - 가로 힌지: 위 시계/아래 무드등, 세로 힌지: 왼쪽 시계/오른쪽 무드등
 - 펼침 또는 일반 스마트폰: 현재 창 비율에 맞춘 안전한 50:50 대체 레이아웃
 - Apple StandBy에서 영감을 받은 큰 저휘도 시계, 날짜·배터리 표시와 켬/끔/자동 야간 모드
-- 단색/그라데이션/오로라 무드등과 세 가지 사용자 색상, 기본 엠비언트 색상 선택
+- 단색/그라데이션/오로라/선셋/촛불 무드등과 세 가지 사용자 색상, 기본 엠비언트 색상 선택
+- Digital Bold/Minimal/Flip/Analog 시계 스타일
 - 좌우 스와이프 시계 → 위젯 → 달력 → 알림 페이지, 상하 스와이프 무드등 변경
 - 둥근 위젯 카드에 실제 기기 캘린더 일정과 최근 알림 표시(전체 기능본)
 - 탭 조작 패널, 길게 눌러 빠른 설정, 2단계 뒤로가기 종료
 - StandBy에서만 적용되는 immersive UI, 앱 내부 밝기, `FLAG_KEEP_SCREEN_ON`
 - 자동 어둡게, 15/30fps 애니메이션, 90초 주기 번인 방지 이동, 조도센서 기반 자동 야간 모드
 - DataStore를 통한 모든 설정과 실행 상태 영속화
-- GitHub Releases 기반 업데이트 확인·앱 내부 APK 다운로드·Android PackageInstaller 설치 세션
+- 설정에서 수동으로 누르는 업데이트 확인·앱 내부 APK 다운로드·검증·Android PackageInstaller 설치 세션
 - `WindowAreaController`의 `TYPE_REAR_FACING` + `OPERATION_PRESENT_ON_AREA` capability 기반 듀얼 화면 실험 기능
 - 네트워크, 계정, 위치, 카메라, 마이크, 저장소 권한 없음
 
@@ -32,7 +33,7 @@ Galaxy Z Fold를 반쯤 접어 탁자에 두었을 때 시계와 무드등으로
 
 Android Studio에서 이 폴더를 열거나 터미널에서 다음을 실행합니다.
 
-직접 설치본은 브라우저 다운로드를 막는 Play 프로텍트의 알림 접근·패키지 설치 권한 차단을 피하기 위해 다른 앱의 알림 리스너와 APK 설치 권한을 포함하지 않습니다. 시계·무드등·캘린더는 그대로 사용할 수 있고, 업데이트 APK는 앱 안에서 먼저 내려받습니다. 안전 설치본은 Android 정책상 마지막 설치 확인을 브라우저/파일 앱에 맡깁니다. 알림과 앱 안 설치까지 필요하면 전체 기능본을 ADB나 Play 스토어 배포로 설치합니다.
+직접 설치본은 Google Play 프로텍트 경고를 일으킬 수 있는 다른 앱 알림 리스너를 제외한 안전 배포판입니다. 시계·무드등·캘린더와 앱 내 업데이트를 사용할 수 있고, 알림 페이지가 필요할 때만 전체 기능본을 선택합니다. 두 배포판 모두 APK를 앱 안에서 내려받고 서명·패키지·버전·크기·SHA-256을 확인한 다음 Android의 사용자 승인 설치 화면으로 넘깁니다.
 
 ```bash
 ./gradlew assembleDirectDebug
@@ -42,8 +43,8 @@ Android Studio에서 이 폴더를 열거나 터미널에서 다음을 실행합
 생성된 설치 파일:
 
 ```text
-app/build/outputs/apk/direct/debug/app-direct-debug.apk  # 브라우저 직접 설치용
-app/build/outputs/apk/full/debug/app-full-debug.apk      # 알림 접근 포함
+app/build/outputs/apk/direct/debug/app-direct-debug.apk  # 알림 리스너 제외 안전 배포판
+app/build/outputs/apk/full/debug/app-full-debug.apk      # 알림 접근 포함 전체 기능본
 ```
 
 이 저장소에서 검증한 명령:
@@ -57,9 +58,9 @@ app/build/outputs/apk/full/debug/app-full-debug.apk      # 알림 접근 포함
 
 ## 앱 안에서 업데이트
 
-앱은 `https://api.github.com/repos/blossom0948/foldstandby/releases/latest`를 확인합니다. 새 Release에 배포판에 맞는 APK asset이 있으면 홈 화면에 업데이트 카드가 나타나고, HTTPS 리다이렉트 확인·임시 파일 저장·재시도·파일 크기 검증을 거친 뒤 앱 내부의 Android `PackageInstaller` 세션으로 전달합니다. 사용자가 누르는 최종 설치 확인 화면만 Android 시스템이 표시하며, 전체 기능본에서는 GitHub 브라우저를 열지 않습니다. Android 8 이상에서는 최초 1회 FoldStand의 **알 수 없는 앱 설치 허용**이 필요합니다.
+설정 → **앱 업데이트**에서 사용자가 `업데이트 확인`을 눌렀을 때만 Release API를 확인합니다. 새 Release에 배포판에 맞는 APK asset이 있으면 앱 안에서 버전·앱 ID·서명·크기·SHA-256을 검증하고 다운로드한 뒤 Android `PackageInstaller` 세션으로 전달합니다. GitHub 웹페이지나 브라우저를 열지 않고, 사용자가 누르는 최종 설치 확인 화면만 Android 시스템이 표시합니다. Android 8 이상에서는 최초 1회 FoldStand의 **알 수 없는 앱 설치 허용**이 필요합니다.
 
-현재 Release에는 `foldstand-safe.apk`(직접 설치본)와 `foldstand-full.apk`(알림 접근·앱 내부 설치 포함)가 함께 제공됩니다. 브라우저에서 설치가 차단되면 직접 설치본을 사용하고, 전체 기능본은 `adb install -r foldstand-full.apk` 또는 Play 스토어 배포 경로를 사용합니다. 안전 설치본에서 전체 기능본으로 바꾸는 것은 동일 서명 APK라 기존 설정을 유지한 채 한 번 설치할 수 있습니다.
+현재 Release에는 `foldstand-safe.apk`(알림 리스너 제외)와 `foldstand-full.apk`(알림 접근 포함)가 함께 제공됩니다. 두 APK 모두 앱 내 업데이트를 지원하며, `adb install -r foldstand-full.apk`로 전체 기능본으로 바꾸면 동일 서명 APK라 기존 설정을 유지합니다.
 
 현재 배포 방식은 GitHub Release APK입니다. Google Play에 게시하게 되면 Play In-App Updates로 교체할 수 있지만, GitHub에서 직접 설치한 앱에는 Play Core 업데이트가 적용되지 않으므로 현재 방식이 이 프로젝트에 맞는 업데이트 경로입니다.
 
