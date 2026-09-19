@@ -191,6 +191,19 @@ fun HomeScreen(
                     Icon(Icons.Default.Smartphone, contentDescription = null)
                     Text("듀얼 화면 실험 기능", modifier = Modifier.padding(start = 10.dp))
                 }
+                if (uiState.dualScreenStatus != DualScreenStatus.Checking &&
+                    uiState.dualScreenStatus != DualScreenStatus.Available &&
+                    uiState.dualScreenStatus != DualScreenStatus.Active
+                ) {
+                    OutlinedButton(
+                        onClick = onStartStandby,
+                        modifier = Modifier.fillMaxWidth().height(54.dp),
+                        shape = RoundedCornerShape(18.dp),
+                    ) {
+                        Icon(Icons.Default.Fullscreen, contentDescription = null)
+                        Text("내부 화면 분할로 시작", modifier = Modifier.padding(start = 10.dp))
+                    }
+                }
                 Text(
                     text = dualScreenExplanation(uiState.dualScreenStatus),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -251,7 +264,14 @@ private fun UpdateCard(
             Text("새 버전${info?.let { " ${it.versionName}" } ?: ""}", style = MaterialTheme.typography.titleMedium)
             when (state) {
                 is UpdateState.Available -> {
-                    Text("GitHub Release에서 업데이트 APK를 내려받을 수 있습니다.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        if (BuildConfig.CAN_INSTALL_UPDATES) {
+                            "FoldStand 앱 안에서 업데이트 파일을 내려받아 설치할 수 있습니다."
+                        } else {
+                            "업데이트 파일은 앱 안에서 먼저 내려받습니다. 안전 설치본은 Android 보안 정책상 마지막 설치 확인이 필요합니다."
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Button(onClick = onDownload) { Text("업데이트 다운로드") }
                 }
                 is UpdateState.Downloading -> {
@@ -264,14 +284,14 @@ private fun UpdateCard(
                 is UpdateState.Ready -> {
                     Text(
                         if (BuildConfig.CAN_INSTALL_UPDATES) {
-                            "다운로드가 완료되었습니다. 설치를 누르면 Android 설치 화면이 열립니다."
+                            "다운로드가 완료되었습니다. GitHub 브라우저를 열지 않고 Android 설치 화면으로 전달합니다."
                         } else {
-                            "직접 설치본은 브라우저에서 APK를 열어 업데이트를 진행합니다."
+                            "안전 설치본은 APK 설치 권한을 포함하지 않습니다. 다운로드 후 브라우저/파일 앱에서 한 번만 설치를 확인해야 합니다. 앱 안 자동 설치는 전체 기능본에서 사용할 수 있습니다."
                         },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Button(onClick = { onInstall(state.file) }) {
-                        Text(if (BuildConfig.CAN_INSTALL_UPDATES) "업데이트 설치" else "브라우저에서 업데이트")
+                        Text(if (BuildConfig.CAN_INSTALL_UPDATES) "업데이트 설치" else "설치 확인 열기")
                     }
                 }
                 is UpdateState.Error -> Text(state.message, color = MaterialTheme.colorScheme.error)
@@ -374,8 +394,7 @@ private fun dualScreenExplanation(status: DualScreenStatus): String = when (stat
     DualScreenStatus.Checking -> "커버 화면 capability를 확인하고 있습니다."
     DualScreenStatus.Available -> "시스템 승인을 거쳐 내부 화면에는 무드등, 보조 화면에는 시계를 표시합니다."
     DualScreenStatus.Active -> "듀얼 화면 세션이 실행 중입니다."
-    DualScreenStatus.Unavailable,
-    DualScreenStatus.Unsupported,
-    is DualScreenStatus.Error,
-    -> "이 기기에서는 커버 화면 동시 표시를 지원하지 않습니다. 내부 화면 분할 모드를 사용해 주세요."
+    DualScreenStatus.Unavailable -> "현재 접힘 상태나 다른 화면 세션 때문에 동시 표시를 시작할 수 없습니다. 내부 화면 분할은 바로 사용할 수 있습니다."
+    DualScreenStatus.Unsupported -> "이 기기는 외부·내부 동시 표시 API를 제공하지 않습니다. 내부 화면 분할로 실행해 주세요."
+    is DualScreenStatus.Error -> "듀얼 화면을 시작하지 못했습니다. 내부 화면 분할로 실행해 주세요. (${status.reason})"
 }

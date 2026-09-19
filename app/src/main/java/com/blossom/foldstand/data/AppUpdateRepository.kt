@@ -1,9 +1,12 @@
 package com.blossom.foldstand.data
 
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
+import android.content.pm.PackageInstaller
+import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import com.blossom.foldstand.BuildConfig
@@ -84,6 +87,61 @@ class AppUpdateRepository(private val context: Context) {
             )
             return
         }
+        runCatching { installWithPackageInstaller(activity, file) }
+            .onFailure { error ->
+                // Some vendor package installers do not expose a PackageInstaller session UI.
+                // Keep a reliable local-URI fallback for those devices; it never opens a web URL.
+                Log.w(TAG, "PackageInstaller session failed; using local APK installer", error)
+                openLocalInstaller(activity, file)
+            }
+    }
+
+    /**
+     * Streams the already downloaded APK into Android's package installer. This keeps the
+     * update flow inside FoldStand until the final, user-confirmed system install screen.
+     */
+    private fun installWithPackageInstaller(activity: android.app.Activity, file: File) {
+        val installer = activity.packageManager.packageInstaller
+        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
+            setAppPackageName(context.packageName)
+            setSize(file.length())
+        }
+        val sessionId = installer.createSession(params)
+        try {
+            installer.openSession(sessionId).use { session ->
+                file.inputStream().use { input ->
+                    session.openWrite("base.apk", 0L, file.length()).use { output ->
+                        input.copyTo(output, DEFAULT_BUFFER_SIZE)
+                        session.fsync(output)
+                    }
+                }
+                val callbackIntent = Intent(context, UpdateInstallReceiver::class.java).apply {
+                    action = UpdateInstallReceiver.ACTION_INSTALL_COMMIT
+                    putExtra(UpdateInstallReceiver.EXTRA_SESSION_ID, sessionId)
+                    setPackage(context.packageName)
+                }
+                val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        // Android 14+ rejects immutable status receivers for targetSdk 35+.
+                        PendingIntent.FLAG_MUTABLE
+                    } else {
+                        0
+                    }
+                val statusReceiver = PendingIntent.getBroadcast(
+                    context,
+                    sessionId,
+                    callbackIntent,
+                    pendingFlags,
+                )
+                session.commit(statusReceiver.intentSender)
+            }
+        } catch (error: Throwable) {
+            runCatching { installer.abandonSession(sessionId) }
+            throw error
+        }
+    }
+
+    private fun openLocalInstaller(activity: android.app.Activity, file: File) {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         activity.startActivity(
             Intent(Intent.ACTION_VIEW).apply {
@@ -212,6 +270,7 @@ class AppUpdateRepository(private val context: Context) {
     }
 
     private companion object {
+        const val TAG = "FoldStandUpdater"
         const val LATEST_RELEASE_URL = "https://api.github.com/repos/blossom0948/foldstandby/releases/latest"
         const val MAX_DOWNLOAD_ATTEMPTS = 3
         const val RETRY_DELAY_MILLIS = 750L

@@ -16,7 +16,7 @@ Galaxy Z Fold를 반쯤 접어 탁자에 두었을 때 시계와 무드등으로
 - StandBy에서만 적용되는 immersive UI, 앱 내부 밝기, `FLAG_KEEP_SCREEN_ON`
 - 자동 어둡게, 15/30fps 애니메이션, 90초 주기 번인 방지 이동, 조도센서 기반 자동 야간 모드
 - DataStore를 통한 모든 설정과 실행 상태 영속화
-- GitHub Releases 기반 업데이트 확인·APK 다운로드·Android 설치 화면 연결
+- GitHub Releases 기반 업데이트 확인·앱 내부 APK 다운로드·Android PackageInstaller 설치 세션
 - `WindowAreaController`의 `TYPE_REAR_FACING` + `OPERATION_PRESENT_ON_AREA` capability 기반 듀얼 화면 실험 기능
 - 네트워크, 계정, 위치, 카메라, 마이크, 저장소 권한 없음
 
@@ -32,7 +32,7 @@ Galaxy Z Fold를 반쯤 접어 탁자에 두었을 때 시계와 무드등으로
 
 Android Studio에서 이 폴더를 열거나 터미널에서 다음을 실행합니다.
 
-직접 설치본은 브라우저 다운로드를 막는 Play 프로텍트의 알림 접근·패키지 설치 권한 차단을 피하기 위해 다른 앱의 알림 리스너와 APK 설치 권한을 포함하지 않습니다. 시계·무드등·캘린더는 그대로 사용할 수 있고, 업데이트 버튼은 브라우저에서 안전 설치본 링크를 엽니다. 알림과 앱 안 설치까지 필요하면 전체 기능본을 ADB나 Play 스토어 배포로 설치합니다.
+직접 설치본은 브라우저 다운로드를 막는 Play 프로텍트의 알림 접근·패키지 설치 권한 차단을 피하기 위해 다른 앱의 알림 리스너와 APK 설치 권한을 포함하지 않습니다. 시계·무드등·캘린더는 그대로 사용할 수 있고, 업데이트 APK는 앱 안에서 먼저 내려받습니다. 안전 설치본은 Android 정책상 마지막 설치 확인을 브라우저/파일 앱에 맡깁니다. 알림과 앱 안 설치까지 필요하면 전체 기능본을 ADB나 Play 스토어 배포로 설치합니다.
 
 ```bash
 ./gradlew assembleDirectDebug
@@ -57,9 +57,9 @@ app/build/outputs/apk/full/debug/app-full-debug.apk      # 알림 접근 포함
 
 ## 앱 안에서 업데이트
 
-앱은 `https://api.github.com/repos/blossom0948/foldstandby/releases/latest`를 확인합니다. 새 Release에 배포판에 맞는 APK asset이 있으면 홈 화면에 업데이트 카드가 나타나고, HTTPS 리다이렉트 확인·임시 파일 저장·재시도·파일 크기 검증을 거친 뒤 다운로드 후 Android 설치 화면을 엽니다. Android 8 이상에서는 최초 1회 FoldStand의 **알 수 없는 앱 설치 허용**이 필요합니다.
+앱은 `https://api.github.com/repos/blossom0948/foldstandby/releases/latest`를 확인합니다. 새 Release에 배포판에 맞는 APK asset이 있으면 홈 화면에 업데이트 카드가 나타나고, HTTPS 리다이렉트 확인·임시 파일 저장·재시도·파일 크기 검증을 거친 뒤 앱 내부의 Android `PackageInstaller` 세션으로 전달합니다. 사용자가 누르는 최종 설치 확인 화면만 Android 시스템이 표시하며, 전체 기능본에서는 GitHub 브라우저를 열지 않습니다. Android 8 이상에서는 최초 1회 FoldStand의 **알 수 없는 앱 설치 허용**이 필요합니다.
 
-현재 Release에는 `foldstand-safe.apk`(직접 설치본)와 `foldstand-full.apk`(알림 접근 포함)가 함께 제공됩니다. 브라우저에서 설치가 차단되면 직접 설치본을 사용하고, 전체 기능본은 `adb install -r foldstand-full.apk` 또는 Play 스토어 배포 경로를 사용합니다.
+현재 Release에는 `foldstand-safe.apk`(직접 설치본)와 `foldstand-full.apk`(알림 접근·앱 내부 설치 포함)가 함께 제공됩니다. 브라우저에서 설치가 차단되면 직접 설치본을 사용하고, 전체 기능본은 `adb install -r foldstand-full.apk` 또는 Play 스토어 배포 경로를 사용합니다. 안전 설치본에서 전체 기능본으로 바꾸는 것은 동일 서명 APK라 기존 설정을 유지한 채 한 번 설치할 수 있습니다.
 
 현재 배포 방식은 GitHub Release APK입니다. Google Play에 게시하게 되면 Play In-App Updates로 교체할 수 있지만, GitHub에서 직접 설치한 앱에는 Play Core 업데이트가 적용되지 않으므로 현재 방식이 이 프로젝트에 맞는 업데이트 경로입니다.
 
@@ -86,7 +86,7 @@ adb install -r app/build/outputs/apk/direct/debug/app-direct-debug.apk
 
 ## 듀얼 화면 실험 기능의 실제 제약
 
-앱은 특정 Galaxy 모델명을 보고 지원 여부를 추측하지 않습니다. AndroidX WindowManager가 런타임에 capability를 `AVAILABLE`로 반환한 경우에만 버튼이 활성화되며, 시스템 승인을 받은 뒤 보조 화면 세션을 시작합니다. 지원되면 내부 화면에는 무드등, 보조 화면에는 시계를 표시합니다. 세션 실패·종료 또는 앱 백그라운드 진입 시 즉시 일반 내부 화면 분할 모드로 돌아갑니다.
+앱은 특정 Galaxy 모델명을 보고 지원 여부를 추측하지 않습니다. AndroidX WindowManager가 런타임에 capability를 `AVAILABLE`로 반환한 경우에만 듀얼 화면 버튼이 활성화되며, 시스템 승인을 받은 뒤 보조 화면 세션을 시작합니다. 지원되면 내부 화면에는 무드등, 보조 화면에는 시계를 표시합니다. `UNSUPPORTED`/`UNAVAILABLE`일 때는 홈에서 **내부 화면 분할로 시작**을 눌러 즉시 사용할 수 있고, 세션 실패·종료 또는 앱 백그라운드 진입 시에도 일반 내부 화면 분할 모드로 돌아갑니다.
 
 공식 Android 문서가 듀얼 화면 모드를 명시적으로 보장하는 대상은 Pixel Fold/Android 14 이상입니다. Galaxy Z Fold에서는 대부분 **지원하지 않음** 또는 **현재 사용할 수 없음**으로 표시될 수 있으며, 이는 오류가 아니라 안전한 fallback입니다.
 

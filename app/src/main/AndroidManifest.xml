@@ -33,6 +33,10 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <receiver
+            android:name=".data.UpdateInstallReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>

@@ -7,12 +7,15 @@ android {
     namespace = "com.blossom.foldstand"
     compileSdk = 37
 
+    val configuredVersionName = providers.gradleProperty("foldstandVersionName").orElse("1.4.0")
+    val configuredVersionCode = providers.gradleProperty("foldstandVersionCode").orElse("10400")
+
     defaultConfig {
         applicationId = "com.blossom.foldstand"
         minSdk = 26
         targetSdk = 37
-        versionCode = 7
-        versionName = "1.3.2"
+        versionCode = configuredVersionCode.get().toInt()
+        versionName = configuredVersionName.get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
