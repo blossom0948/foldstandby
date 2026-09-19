@@ -56,6 +56,12 @@ fun FoldStandNavGraph(
                 updateState = updateState,
                 onStartStandby = {
                     viewModel.startStandby()
+                    // When the device exposes the public dual-screen capability, prefer it
+                    // for the primary action. The controller falls back to the inner split
+                    // layout if the system rejects the session.
+                    if (uiState.dualScreenStatus == com.blossom.foldstand.domain.DualScreenStatus.Available) {
+                        onStartDualScreen()
+                    }
                     navController.navigate(Routes.Standby) { launchSingleTop = true }
                 },
                 onOpenSettings = { navController.navigate(Routes.Settings) },

@@ -44,7 +44,7 @@ class DualScreenController(
         }
         scope.launch {
             activeController.windowAreaInfos
-                .map { infos -> infos.firstOrNull { it.type == WindowAreaInfo.Type.TYPE_REAR_FACING } }
+                .map { infos -> infos.presentableRearArea() }
                 .distinctUntilChanged()
                 .catch { error ->
                     areaInfo = null
@@ -119,6 +119,21 @@ class DualScreenController(
 
     private fun capabilityStatus(): DualScreenStatus =
         areaInfo?.getCapability(PRESENT_OPERATION)?.status.toDomainStatus()
+
+    /**
+     * Some implementations expose more than one rear-facing area while a fold is moving.
+     * Do not let an unsupported placeholder hide an area that is actually presentable.
+     */
+    private fun List<WindowAreaInfo>.presentableRearArea(): WindowAreaInfo? {
+        val rearAreas = filter { it.type == WindowAreaInfo.Type.TYPE_REAR_FACING }
+        return rearAreas.firstOrNull {
+            it.getCapability(PRESENT_OPERATION)?.status ==
+                WindowAreaCapability.Status.WINDOW_AREA_STATUS_ACTIVE
+        } ?: rearAreas.firstOrNull {
+            it.getCapability(PRESENT_OPERATION)?.status ==
+                WindowAreaCapability.Status.WINDOW_AREA_STATUS_AVAILABLE
+        } ?: rearAreas.firstOrNull()
+    }
 
     private fun WindowAreaCapability.Status?.toDomainStatus(): DualScreenStatus {
         val raw = when (this) {
