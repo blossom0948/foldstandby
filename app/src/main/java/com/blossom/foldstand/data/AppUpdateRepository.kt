@@ -69,6 +69,12 @@ class AppUpdateRepository(private val context: Context) {
     }
 
     fun install(activity: android.app.Activity, file: File) {
+        if (!BuildConfig.CAN_INSTALL_UPDATES) {
+            availableInfo?.downloadUrl?.takeIf(String::isNotBlank)?.let { downloadUrl ->
+                activity.startActivity(Intent(Intent.ACTION_VIEW, downloadUrl.toUri()))
+            }
+            return
+        }
         if (!activity.packageManager.canRequestPackageInstalls()) {
             activity.startActivity(
                 Intent(

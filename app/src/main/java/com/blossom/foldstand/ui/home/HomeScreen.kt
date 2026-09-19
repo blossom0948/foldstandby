@@ -54,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.blossom.foldstand.BuildConfig
 import com.blossom.foldstand.domain.DualScreenStatus
 import com.blossom.foldstand.domain.FoldPosture
 import com.blossom.foldstand.domain.StandbyUiState
@@ -261,8 +262,17 @@ private fun UpdateCard(
                     )
                 }
                 is UpdateState.Ready -> {
-                    Text("다운로드가 완료되었습니다. 설치를 누르면 Android 설치 화면이 열립니다.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Button(onClick = { onInstall(state.file) }) { Text("업데이트 설치") }
+                    Text(
+                        if (BuildConfig.CAN_INSTALL_UPDATES) {
+                            "다운로드가 완료되었습니다. 설치를 누르면 Android 설치 화면이 열립니다."
+                        } else {
+                            "직접 설치본은 브라우저에서 APK를 열어 업데이트를 진행합니다."
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Button(onClick = { onInstall(state.file) }) {
+                        Text(if (BuildConfig.CAN_INSTALL_UPDATES) "업데이트 설치" else "브라우저에서 업데이트")
+                    }
                 }
                 is UpdateState.Error -> Text(state.message, color = MaterialTheme.colorScheme.error)
                 else -> Unit
