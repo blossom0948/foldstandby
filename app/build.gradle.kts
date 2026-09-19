@@ -7,8 +7,8 @@ android {
     namespace = "com.blossom.foldstand"
     compileSdk = 37
 
-    val configuredVersionName = providers.gradleProperty("foldstandVersionName").orElse("1.5.1")
-    val configuredVersionCode = providers.gradleProperty("foldstandVersionCode").orElse("10501")
+    val configuredVersionName = providers.gradleProperty("foldstandVersionName").orElse("1.5.2")
+    val configuredVersionCode = providers.gradleProperty("foldstandVersionCode").orElse("10502")
 
     defaultConfig {
         applicationId = "com.blossom.foldstand"

@@ -1,10 +1,13 @@
 package com.blossom.foldstand.fold
 
 import android.util.Log
+import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.window.core.ExperimentalWindowApi
 import androidx.window.area.WindowAreaCapability
 import androidx.window.area.WindowAreaController
@@ -14,6 +17,7 @@ import androidx.window.area.WindowAreaSessionPresenter
 import com.blossom.foldstand.domain.DualScreenStatus
 import java.util.concurrent.Executor
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +39,8 @@ class DualScreenController(
     private var session: WindowAreaSessionPresenter? = null
     private var presentationView: ComposeView? = null
     private var presentationContent: (@Composable () -> Unit)? = null
+    private var requestInFlight = false
+    private var closeRequested = false
 
     fun start(scope: CoroutineScope) {
         val activeController = controller
@@ -42,28 +48,33 @@ class DualScreenController(
             _status.value = DualScreenStatus.Unsupported
             return
         }
-        scope.launch {
-            activeController.windowAreaInfos
-                .map { infos -> infos.presentableRearArea() }
-                .distinctUntilChanged()
-                .catch { error ->
-                    areaInfo = null
-                    _status.value = DualScreenStatus.Error(error.message ?: "capability 확인 실패")
+        scope.launch(Dispatchers.Main.immediate) {
+            activity.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                activeController.windowAreaInfos
+                    .map { infos -> infos.presentableRearArea() }
+                    .distinctUntilChanged()
+                    .catch { error ->
+                        areaInfo = null
+                        _status.value = DualScreenStatus.Error(error.message ?: "capability 확인 실패")
+                    }
+                    .collect { info ->
+                        areaInfo = info
+                        _status.value = info?.getCapability(PRESENT_OPERATION)?.status.toDomainStatus()
+                    }
                 }
-                .collect { info ->
-                    areaInfo = info
-                    _status.value = info?.getCapability(PRESENT_OPERATION)?.status.toDomainStatus()
-                }
-        }
+            }
     }
 
     fun requestPresentation(content: @Composable () -> Unit) {
         val activeController = controller
         val info = areaInfo
+        if (session != null || requestInFlight) return
         if (activeController == null || info == null || _status.value != DualScreenStatus.Available) {
             if (_status.value !is DualScreenStatus.Error) _status.value = DualScreenStatus.Unavailable
             return
         }
+        closeRequested = false
+        requestInFlight = true
         presentationContent = content
         runCatching {
             activeController.presentContentOnWindowArea(
@@ -73,31 +84,54 @@ class DualScreenController(
                 windowAreaPresentationSessionCallback = this,
             )
         }.onFailure { error ->
+            requestInFlight = false
             presentationContent = null
             _status.value = DualScreenStatus.Error(error.message ?: "보조 화면 시작 실패")
         }
     }
 
     fun close() {
-        session?.close()
+        closeRequested = session != null || requestInFlight
+        requestInFlight = false
+        runCatching { session?.close() }
         clearSession()
         refreshCapabilityStatus()
+        if (!closeRequested) closeRequested = false
     }
 
     override fun onSessionStarted(session: WindowAreaSessionPresenter) {
-        this.session = session
-        val view = ComposeView(session.context).apply {
-            setContent { presentationContent?.invoke() }
+        requestInFlight = false
+        val content = presentationContent
+        if (content == null || closeRequested) {
+            runCatching { session.close() }
+            closeRequested = false
+            return
         }
-        presentationView = view
-        session.setContentView(view)
-        _status.value = DualScreenStatus.Active
+        this.session = session
+        val view = ComposeView(session.context)
+        runCatching {
+            installViewTreeOwners(view)
+            view.setContent { content() }
+            session.setContentView(view)
+            view
+        }.onFailure { error ->
+            Log.e(TAG, "Unable to attach dual-screen content", error)
+            runCatching { session.close() }
+            clearSession()
+            _status.value = DualScreenStatus.Error(error.message ?: "보조 화면 콘텐츠 연결 실패")
+        }.onSuccess {
+            presentationView = view
+            _status.value = DualScreenStatus.Active
+        }
     }
 
     override fun onSessionEnded(t: Throwable?) {
         if (t != null) Log.e(TAG, "Dual-screen session ended with an error", t)
+        requestInFlight = false
+        val wasCloseRequested = closeRequested
+        closeRequested = false
         clearSession()
-        _status.value = if (t == null) capabilityStatus() else {
+        _status.value = if (t == null || wasCloseRequested) capabilityStatus() else {
             DualScreenStatus.Error(t.message ?: "보조 화면 세션 종료")
         }
     }
@@ -115,6 +149,32 @@ class DualScreenController(
 
     private fun refreshCapabilityStatus() {
         _status.value = capabilityStatus()
+    }
+
+    /**
+     * The WindowArea presenter owns a separate view tree. Some OEM builds do not
+     * install the lifecycle/saved-state owners that Compose's window recomposer
+     * requires, so copy the activity owners onto the presenter root when the
+     * public setter classes are available. Reflection keeps this compatible with
+     * the different AndroidX packaging used by older devices.
+     */
+    private fun installViewTreeOwners(view: View) {
+        runCatching {
+            val lifecycleOwnerType = Class.forName("androidx.lifecycle.LifecycleOwner")
+            Class.forName("androidx.lifecycle.ViewTreeLifecycleOwner")
+                .getMethod("set", View::class.java, lifecycleOwnerType)
+                .invoke(null, view, activity)
+        }.onFailure { error ->
+            Log.w(TAG, "Presenter lifecycle owner is unavailable", error)
+        }
+        runCatching {
+            val savedStateOwnerType = Class.forName("androidx.savedstate.SavedStateRegistryOwner")
+            Class.forName("androidx.savedstate.ViewTreeSavedStateRegistryOwner")
+                .getMethod("set", View::class.java, savedStateOwnerType)
+                .invoke(null, view, activity)
+        }.onFailure { error ->
+            Log.w(TAG, "Presenter saved-state owner is unavailable", error)
+        }
     }
 
     private fun capabilityStatus(): DualScreenStatus =

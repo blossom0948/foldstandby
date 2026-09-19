@@ -95,11 +95,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onStop() {
-        if (::dualScreenController.isInitialized) dualScreenController.close()
-        super.onStop()
-    }
-
     override fun onResume() {
         super.onResume()
         (application as FoldStandApp).appUpdateRepository.resumePendingInstall(this)

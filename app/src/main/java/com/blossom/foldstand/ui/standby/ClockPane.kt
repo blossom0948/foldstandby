@@ -36,9 +36,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
 import com.blossom.foldstand.domain.BatteryState
 import com.blossom.foldstand.domain.ClockStyle
 import com.blossom.foldstand.domain.StandbySettings
@@ -48,6 +45,7 @@ import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 @Composable
 fun ClockPane(
@@ -311,19 +309,18 @@ private fun AnalogClockDisplay(
 
 @Composable
 private fun currentClockTime(showSeconds: Boolean): androidx.compose.runtime.State<ZonedDateTime> {
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
     return produceState(
         initialValue = ZonedDateTime.now(),
         key1 = showSeconds,
-        key2 = lifecycle,
     ) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            val period = if (showSeconds) 1_000L else 60_000L
-            while (true) {
-                value = ZonedDateTime.now()
-                val remainder = System.currentTimeMillis().mod(period)
-                delay((period - remainder).coerceAtLeast(25L))
-            }
+        // The rear-display WindowArea receives a separate ComposeView and may not
+        // provide a ViewTreeLifecycleOwner. The producer is cancelled automatically
+        // when that view is disposed, so no lifecycle composition local is needed.
+        val period = if (showSeconds) 1_000L else 60_000L
+        while (isActive) {
+            value = ZonedDateTime.now()
+            val remainder = System.currentTimeMillis().mod(period)
+            delay((period - remainder).coerceAtLeast(25L))
         }
     }
 }
