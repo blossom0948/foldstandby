@@ -87,13 +87,15 @@ class AppUpdateRepository(private val context: Context) {
             )
             return
         }
-        runCatching { installWithPackageInstaller(activity, file) }
-            .onFailure { error ->
-                // Some vendor package installers do not expose a PackageInstaller session UI.
-                // Keep a reliable local-URI fallback for those devices; it never opens a web URL.
-                Log.w(TAG, "PackageInstaller session failed; using local APK installer", error)
-                openLocalInstaller(activity, file)
-            }
+        scope.launch {
+            runCatching { installWithPackageInstaller(activity, file) }
+                .onFailure { error ->
+                    // Some vendor package installers do not expose a PackageInstaller session UI.
+                    // Keep a reliable local-URI fallback for those devices; it never opens a web URL.
+                    Log.w(TAG, "PackageInstaller session failed; using local APK installer", error)
+                    withContext(Dispatchers.Main) { openLocalInstaller(activity, file) }
+                }
+        }
     }
 
     /**
