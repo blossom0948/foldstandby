@@ -27,6 +27,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.blossom.foldstand.fold.DualCoverClockView
 import com.blossom.foldstand.fold.DualScreenController
 import com.blossom.foldstand.fold.FoldStateObserver
 import com.blossom.foldstand.ui.navigation.FoldStandNavGraph
@@ -82,18 +83,22 @@ class MainActivity : ComponentActivity() {
                 FoldStandNavGraph(
                     viewModel = viewModel,
                     onStartDualScreen = {
-                        dualScreenController.requestPresentation {
-                            val coverState by viewModel.dualCoverUiState.collectAsState()
-                            FoldStandTheme {
-                                Box(Modifier.fillMaxSize().background(Color.Black)) {
-                                    CoverStandbyPane(
-                                        settings = coverState.settings,
-                                        battery = coverState.battery,
-                                        calendarPermissionGranted = calendarPermissionGranted,
-                                    )
+                        dualScreenController.requestPresentation(
+                            content = {
+                                val coverState by viewModel.dualCoverUiState.collectAsState()
+                                FoldStandTheme {
+                                    Box(Modifier.fillMaxSize().background(Color.Black)) {
+                                        CoverStandbyPane(
+                                            settings = coverState.settings,
+                                            battery = coverState.battery,
+                                            calendarPermissionGranted = calendarPermissionGranted,
+                                            showClock = false,
+                                        )
+                                    }
                                 }
-                            }
-                        }
+                            },
+                            fallbackView = { context -> DualCoverClockView(context, viewModel.dualCoverUiState) },
+                        )
                     },
                     onStopDualScreen = dualScreenController::close,
                     calendarPermissionGranted = calendarPermissionGranted,

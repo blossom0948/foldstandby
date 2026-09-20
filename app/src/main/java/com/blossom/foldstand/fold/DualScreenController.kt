@@ -1,7 +1,10 @@
 package com.blossom.foldstand.fold
 
+import android.graphics.Color
 import android.util.Log
 import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.ComposeView
@@ -42,6 +45,7 @@ class DualScreenController(
     private var session: WindowAreaSessionPresenter? = null
     private var presentationView: ComposeView? = null
     private var presentationContent: (@Composable () -> Unit)? = null
+    private var fallbackViewFactory: ((android.content.Context) -> View)? = null
     private var requestInFlight = false
     private var closeRequested = false
     private var presentationRequested = false
@@ -81,7 +85,10 @@ class DualScreenController(
             }
     }
 
-    fun requestPresentation(content: @Composable () -> Unit) {
+    fun requestPresentation(
+        content: @Composable () -> Unit,
+        fallbackView: ((android.content.Context) -> View)? = null,
+    ) {
         val activeController = controller
         val info = areaInfo
         if (session != null || requestInFlight) return
@@ -98,6 +105,7 @@ class DualScreenController(
         closeRequested = false
         requestInFlight = true
         presentationContent = content
+        fallbackViewFactory = fallbackView
         runCatching {
             activeController.presentContentOnWindowArea(
                 token = info.token,
@@ -109,6 +117,7 @@ class DualScreenController(
             requestInFlight = false
             presentationRequested = false
             presentationContent = null
+            fallbackViewFactory = null
             _status.value = DualScreenStatus.Error(error.message ?: "보조 화면 시작 실패")
         }
     }
@@ -128,6 +137,7 @@ class DualScreenController(
     override fun onSessionStarted(session: WindowAreaSessionPresenter) {
         requestInFlight = false
         val content = presentationContent
+        val fallbackFactory = fallbackViewFactory
         if (content == null || closeRequested) {
             runCatching { session.close() }
             closeRequested = false
@@ -136,22 +146,53 @@ class DualScreenController(
         this.session = session
         retryJob?.cancel()
         retryJob = null
-        val view = ComposeView(session.context)
-        runCatching {
-            installViewTreeOwners(view)
-            view.setContent { content() }
-            session.setContentView(view)
-            view
-        }.onFailure { error ->
-            Log.e(TAG, "Unable to attach dual-screen content", error)
-            runCatching { session.close() }
-            clearSession()
-            presentationRequested = false
-            _status.value = DualScreenStatus.Error(error.message ?: "보조 화면 콘텐츠 연결 실패")
-        }.onSuccess {
-            presentationView = view
-            _status.value = DualScreenStatus.Active
+        val root = FrameLayout(session.context).apply {
+            setBackgroundColor(Color.BLACK)
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
         }
+        val view = ComposeView(session.context)
+        installViewTreeOwners(root)
+        val composeReady = runCatching {
+            view.setContent { content() }
+            root.addView(
+                view,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                ),
+            )
+        }.onFailure { error ->
+            Log.e(TAG, "Unable to attach dual-screen Compose content", error)
+        }.isSuccess
+        fallbackFactory?.let { factory ->
+            runCatching {
+                // Keep the native clock above Compose. Its transparent canvas
+                // leaves the widget cards visible while guaranteeing the clock
+                // remains visible even if Compose renders an empty surface.
+                root.addView(
+                    factory(session.context),
+                    FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                    ),
+                )
+            }.onFailure { error -> Log.e(TAG, "Unable to attach native cover fallback", error) }
+        }
+        runCatching { session.setContentView(root) }
+            .onFailure { error ->
+                Log.e(TAG, "Unable to attach dual-screen root", error)
+                runCatching { session.close() }
+                clearSession()
+                presentationRequested = false
+                _status.value = DualScreenStatus.Error(error.message ?: "보조 화면 콘텐츠 연결 실패")
+            }
+            .onSuccess {
+                presentationView = if (composeReady) view else null
+                _status.value = DualScreenStatus.Active
+            }
     }
 
     override fun onSessionEnded(t: Throwable?) {
@@ -177,12 +218,15 @@ class DualScreenController(
 
     private fun clearSession(keepPresentationContent: Boolean) {
         val savedContent = if (keepPresentationContent) presentationContent else null
+        val savedFallback = if (keepPresentationContent) fallbackViewFactory else null
         presentationView?.disposeComposition()
         presentationView = null
         presentationContent = null
+        fallbackViewFactory = null
         // Restore the content after disposing only the old remote view. The
         // retry path uses the same lambda to create a fresh presenter.
         presentationContent = savedContent
+        fallbackViewFactory = savedFallback
         session = null
     }
 

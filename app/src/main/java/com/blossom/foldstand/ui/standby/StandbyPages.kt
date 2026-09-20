@@ -80,6 +80,7 @@ fun CoverStandbyPane(
     battery: BatteryState,
     calendarPermissionGranted: Boolean,
     modifier: Modifier = Modifier,
+    showClock: Boolean = true,
 ) {
     val context = LocalContext.current
     val events by rememberUpcomingEvents(context, calendarPermissionGranted)
@@ -94,18 +95,28 @@ fun CoverStandbyPane(
     }
     BoxWithConstraints(modifier = modifier.fillMaxSize().padding(18.dp)) {
         val narrow = maxWidth < maxHeight * 0.82f
-        if (narrow) {
+        if (showClock && narrow) {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.fillMaxWidth().weight(0.62f)) {
                     ClockPane(settings = settings, battery = battery, nightTint = nightTint)
                 }
                 CoverInfoRow(battery, events, notifications, Modifier.weight(0.38f))
             }
-        } else {
+        } else if (showClock) {
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Box(Modifier.weight(0.62f).fillMaxSize()) {
                     ClockPane(settings = settings, battery = battery, nightTint = nightTint)
                 }
+                CoverInfoColumn(settings, battery, events, notifications, Modifier.weight(0.38f))
+            }
+        } else if (narrow) {
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Spacer(Modifier.weight(0.62f))
+                CoverInfoRow(battery, events, notifications, Modifier.weight(0.38f))
+            }
+        } else {
+            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Spacer(Modifier.weight(0.62f))
                 CoverInfoColumn(settings, battery, events, notifications, Modifier.weight(0.38f))
             }
         }
