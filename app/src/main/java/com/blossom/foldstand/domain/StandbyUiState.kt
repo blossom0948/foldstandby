@@ -33,3 +33,13 @@ data class StandbyUiState(
 ) {
     val isRunning: Boolean get() = settings.isRunning
 }
+
+/**
+ * State intentionally kept separate from the primary StandBy page state.
+ * The rear/cover presentation must not be recreated when the inner display
+ * changes its widget page or animation target.
+ */
+data class DualCoverUiState(
+    val settings: StandbySettings = StandbySettings.Default,
+    val battery: BatteryState = BatteryState(),
+)

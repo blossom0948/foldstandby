@@ -9,6 +9,7 @@ import com.blossom.foldstand.data.SettingsRepository
 import com.blossom.foldstand.domain.AmbientPreset
 import com.blossom.foldstand.domain.ClockStyle
 import com.blossom.foldstand.domain.DualScreenStatus
+import com.blossom.foldstand.domain.DualCoverUiState
 import com.blossom.foldstand.domain.FoldPosture
 import com.blossom.foldstand.domain.StandbySettings
 import com.blossom.foldstand.domain.StandbyPage
@@ -36,6 +37,19 @@ class FoldStandViewModel(
     private val settings = settingsRepository.settings
         .onEach { loaded.value = true }
     private val battery = batteryStateObserver.state
+
+    /**
+     * The presented cover window deliberately observes only settings and
+     * battery. In particular it must never collect [uiState], whose page
+     * changes are owned by the inner display.
+     */
+    val dualCoverUiState = combine(settings, battery) { currentSettings, currentBattery ->
+        DualCoverUiState(settings = currentSettings, battery = currentBattery)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = DualCoverUiState(),
+    )
 
     private val baseUiState = combine(
         settings,

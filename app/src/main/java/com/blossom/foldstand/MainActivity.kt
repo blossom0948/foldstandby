@@ -83,12 +83,12 @@ class MainActivity : ComponentActivity() {
                     viewModel = viewModel,
                     onStartDualScreen = {
                         dualScreenController.requestPresentation {
-                            val uiState by viewModel.uiState.collectAsState()
+                            val coverState by viewModel.dualCoverUiState.collectAsState()
                             FoldStandTheme {
                                 Box(Modifier.fillMaxSize().background(Color.Black)) {
                                     CoverStandbyPane(
-                                        settings = uiState.settings,
-                                        battery = uiState.battery,
+                                        settings = coverState.settings,
+                                        battery = coverState.battery,
                                         calendarPermissionGranted = calendarPermissionGranted,
                                     )
                                 }

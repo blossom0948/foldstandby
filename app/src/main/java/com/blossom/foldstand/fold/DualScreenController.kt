@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalWindowApi::class)
@@ -43,8 +44,12 @@ class DualScreenController(
     private var presentationContent: (@Composable () -> Unit)? = null
     private var requestInFlight = false
     private var closeRequested = false
+    private var presentationRequested = false
+    private var lifecycleScope: CoroutineScope? = null
+    private var retryJob: Job? = null
 
     fun start(scope: CoroutineScope) {
+        lifecycleScope = scope
         val activeController = controller
         if (activeController == null) {
             _status.value = DualScreenStatus.Unsupported
@@ -67,6 +72,9 @@ class DualScreenController(
                         delay(CAPABILITY_SETTLE_MILLIS)
                         if (session == null && !requestInFlight) {
                             _status.value = info?.getCapability(PRESENT_OPERATION)?.status.toDomainStatus()
+                            if (presentationRequested && presentationContent != null) {
+                                schedulePresentationRetry()
+                            }
                         }
                     }
                 }
@@ -77,10 +85,16 @@ class DualScreenController(
         val activeController = controller
         val info = areaInfo
         if (session != null || requestInFlight) return
-        if (activeController == null || info == null || _status.value != DualScreenStatus.Available) {
+        val capability = info?.getCapability(PRESENT_OPERATION)?.status
+        val canRequest = _status.value == DualScreenStatus.Available ||
+            capability == WindowAreaCapability.Status.WINDOW_AREA_STATUS_AVAILABLE ||
+            capability == WindowAreaCapability.Status.WINDOW_AREA_STATUS_ACTIVE
+        if (activeController == null || info == null || !canRequest) {
             if (_status.value !is DualScreenStatus.Error) _status.value = DualScreenStatus.Unavailable
             return
         }
+        presentationRequested = true
+        retryJob?.cancel()
         closeRequested = false
         requestInFlight = true
         presentationContent = content
@@ -93,6 +107,7 @@ class DualScreenController(
             )
         }.onFailure { error ->
             requestInFlight = false
+            presentationRequested = false
             presentationContent = null
             _status.value = DualScreenStatus.Error(error.message ?: "보조 화면 시작 실패")
         }
@@ -100,6 +115,9 @@ class DualScreenController(
 
     fun close() {
         closeRequested = session != null || requestInFlight
+        presentationRequested = false
+        retryJob?.cancel()
+        retryJob = null
         requestInFlight = false
         runCatching { session?.close() }
         clearSession()
@@ -116,6 +134,8 @@ class DualScreenController(
             return
         }
         this.session = session
+        retryJob?.cancel()
+        retryJob = null
         val view = ComposeView(session.context)
         runCatching {
             installViewTreeOwners(view)
@@ -126,6 +146,7 @@ class DualScreenController(
             Log.e(TAG, "Unable to attach dual-screen content", error)
             runCatching { session.close() }
             clearSession()
+            presentationRequested = false
             _status.value = DualScreenStatus.Error(error.message ?: "보조 화면 콘텐츠 연결 실패")
         }.onSuccess {
             presentationView = view
@@ -137,11 +158,13 @@ class DualScreenController(
         if (t != null) Log.e(TAG, "Dual-screen session ended with an error", t)
         requestInFlight = false
         val wasCloseRequested = closeRequested
+        val shouldRestart = !wasCloseRequested && presentationRequested && presentationContent != null
         closeRequested = false
-        clearSession()
+        clearSession(keepPresentationContent = shouldRestart)
         _status.value = if (t == null || wasCloseRequested) capabilityStatus() else {
             DualScreenStatus.Error(t.message ?: "보조 화면 세션 종료")
         }
+        if (shouldRestart) schedulePresentationRetry()
     }
 
     override fun onContainerVisibilityChanged(isVisible: Boolean) {
@@ -149,10 +172,38 @@ class DualScreenController(
     }
 
     private fun clearSession() {
+        clearSession(keepPresentationContent = false)
+    }
+
+    private fun clearSession(keepPresentationContent: Boolean) {
+        val savedContent = if (keepPresentationContent) presentationContent else null
         presentationView?.disposeComposition()
         presentationView = null
         presentationContent = null
+        // Restore the content after disposing only the old remote view. The
+        // retry path uses the same lambda to create a fresh presenter.
+        presentationContent = savedContent
         session = null
+    }
+
+    private fun schedulePresentationRetry() {
+        retryJob?.cancel()
+        val scope = lifecycleScope ?: return
+        val content = presentationContent ?: return
+        retryJob = scope.launch(Dispatchers.Main.immediate) {
+            repeat(MAX_PRESENTATION_RETRIES) { attempt ->
+                delay(if (attempt == 0) FIRST_RETRY_DELAY_MILLIS else RETRY_DELAY_MILLIS)
+                if (!presentationRequested || session != null || requestInFlight || presentationContent == null) return@launch
+                if (!activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@launch
+                val status = areaInfo?.getCapability(PRESENT_OPERATION)?.status
+                if (status == WindowAreaCapability.Status.WINDOW_AREA_STATUS_AVAILABLE ||
+                    status == WindowAreaCapability.Status.WINDOW_AREA_STATUS_ACTIVE
+                ) {
+                    requestPresentation(content)
+                    return@launch
+                }
+            }
+        }
     }
 
     private fun refreshCapabilityStatus() {
@@ -225,6 +276,9 @@ class DualScreenController(
     private companion object {
         const val TAG = "FoldStandDualScreen"
         const val CAPABILITY_SETTLE_MILLIS = 240L
+        const val FIRST_RETRY_DELAY_MILLIS = 250L
+        const val RETRY_DELAY_MILLIS = 750L
+        const val MAX_PRESENTATION_RETRIES = 40
         val PRESENT_OPERATION = WindowAreaCapability.Operation.OPERATION_PRESENT_ON_AREA
     }
 }

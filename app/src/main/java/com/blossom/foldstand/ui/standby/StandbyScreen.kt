@@ -128,6 +128,14 @@ fun StandbyScreen(
         NightModeOption.Auto -> darkEnvironment
     }
     val nightBrightnessFactor = if (redNightMode) 0.52f else 1f
+    // A dual presentation owns the cover clock. Keep the primary page key at
+    // Clock so a late page update (for example from a gesture delivered while
+    // the hinge is moving) can never animate the clock off the inner surface.
+    val primaryPage = if (uiState.dualScreenStatus == DualScreenStatus.Active) {
+        StandbyPage.Clock
+    } else {
+        uiState.page
+    }
 
     fun recordInteraction() {
         interactionNonce++
@@ -211,7 +219,7 @@ fun StandbyScreen(
             modifier = Modifier.fillMaxSize(),
         ) { (_, _) ->
             AnimatedContent(
-                targetState = uiState.page,
+                targetState = primaryPage,
                 transitionSpec = {
                     val forward = pageDirection > 0
                     (slideInHorizontally(
@@ -287,7 +295,9 @@ fun StandbyScreen(
             }
         }
 
-        PageIndicator(page = uiState.page.asWidgetPage(), modifier = Modifier.align(Alignment.BottomCenter))
+        if (uiState.dualScreenStatus != DualScreenStatus.Active) {
+            PageIndicator(page = uiState.page.asWidgetPage(), modifier = Modifier.align(Alignment.BottomCenter))
+        }
 
         AnimatedVisibility(
             visible = controlsVisible,
