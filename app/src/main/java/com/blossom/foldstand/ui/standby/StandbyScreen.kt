@@ -178,7 +178,8 @@ fun StandbyScreen(
                 onDragEnd = {
                     val threshold = 64.dp.toPx()
                     when {
-                        abs(dragTotal.x) > abs(dragTotal.y) && abs(dragTotal.x) > threshold -> {
+                        abs(dragTotal.x) > abs(dragTotal.y) && abs(dragTotal.x) > threshold &&
+                            uiState.dualScreenStatus != DualScreenStatus.Active -> {
                             pageDirection = if (dragTotal.x < 0) 1 else -1
                             onPageChange(pageDirection)
                         }
@@ -219,7 +220,20 @@ fun StandbyScreen(
                 label = "standby horizontal page transition",
                 modifier = Modifier.fillMaxSize(),
             ) { page ->
-                if (page != StandbyPage.Clock) {
+                if (uiState.dualScreenStatus == DualScreenStatus.Active &&
+                    !uiState.settings.coverOnlyMode
+                ) {
+                    // A presentation session owns the cover clock. Keep the
+                    // primary display as the ambient pane for the whole session;
+                    // otherwise a page-state recomposition can briefly restore
+                    // the clock on the inner display while the cover is redrawn.
+                    AmbientPane(
+                        preset = uiState.settings.ambientPreset,
+                        colorValues = uiState.settings.customColors,
+                        primaryColorIndex = uiState.settings.ambientColorIndex,
+                        powerSaving = uiState.settings.powerSavingAnimation,
+                    )
+                } else if (page != StandbyPage.Clock) {
                     when (page) {
                         StandbyPage.Widgets -> StandbyWidgetsPane(
                             calendarPermissionGranted = calendarPermissionGranted,
