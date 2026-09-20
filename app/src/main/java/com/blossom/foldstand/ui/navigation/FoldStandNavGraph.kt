@@ -81,6 +81,7 @@ fun FoldStandNavGraph(
             StandbyScreen(
                 uiState = uiState,
                 onPageChange = viewModel::movePage,
+                onCycleClockStyle = viewModel::cycleClockStyle,
                 onCycleAmbientPreset = viewModel::cycleAmbientPreset,
                 onSettingsChange = viewModel::updateSettings,
                 onOpenSettings = { navController.navigate(Routes.Settings) },

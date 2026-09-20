@@ -21,6 +21,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -70,15 +71,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -88,13 +86,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.blossom.foldstand.domain.DualScreenStatus
 import com.blossom.foldstand.domain.AmbientPreset
-import com.blossom.foldstand.domain.FoldPosture
+import com.blossom.foldstand.domain.BatteryState
+import com.blossom.foldstand.domain.ClockStyle
 import com.blossom.foldstand.domain.StandbySettings
 import com.blossom.foldstand.domain.StandbyPage
 import com.blossom.foldstand.domain.NightModeOption
 import com.blossom.foldstand.domain.StandbyUiState
 import com.blossom.foldstand.domain.readableName
-import com.blossom.foldstand.fold.FoldLayoutCalculator
 import java.time.LocalTime
 import kotlin.math.abs
 import kotlinx.coroutines.delay
@@ -104,6 +102,7 @@ import kotlinx.coroutines.delay
 fun StandbyScreen(
     uiState: StandbyUiState,
     onPageChange: (Int) -> Unit,
+    onCycleClockStyle: (Int) -> Unit,
     onCycleAmbientPreset: (Int) -> Unit,
     onSettingsChange: ((StandbySettings) -> StandbySettings) -> Unit,
     onOpenSettings: () -> Unit,
@@ -178,13 +177,20 @@ fun StandbyScreen(
                 onDragEnd = {
                     val threshold = 64.dp.toPx()
                     when {
-                        abs(dragTotal.x) > abs(dragTotal.y) && abs(dragTotal.x) > threshold &&
-                            uiState.dualScreenStatus != DualScreenStatus.Active -> {
+                        abs(dragTotal.x) > abs(dragTotal.y) && abs(dragTotal.x) > threshold -> {
                             pageDirection = if (dragTotal.x < 0) 1 else -1
-                            onPageChange(pageDirection)
+                            if (uiState.dualScreenStatus != DualScreenStatus.Active) {
+                                onCycleClockStyle(pageDirection)
+                            }
                         }
-                        abs(dragTotal.y) > threshold ->
-                            onCycleAmbientPreset(if (dragTotal.y < 0) 1 else -1)
+                        abs(dragTotal.y) > threshold -> {
+                            pageDirection = if (dragTotal.y < 0) 1 else -1
+                            if (uiState.dualScreenStatus == DualScreenStatus.Active) {
+                                onCycleAmbientPreset(pageDirection)
+                            } else {
+                                onPageChange(pageDirection)
+                            }
+                        }
                     }
                     dragTotal = Offset.Zero
                 },
@@ -203,7 +209,7 @@ fun StandbyScreen(
             animationSpec = tween(320),
             label = "fold posture transition",
             modifier = Modifier.fillMaxSize(),
-        ) { (posture, reverse) ->
+        ) { (_, _) ->
             AnimatedContent(
                 targetState = uiState.page,
                 transitionSpec = {
@@ -233,55 +239,22 @@ fun StandbyScreen(
                         primaryColorIndex = uiState.settings.ambientColorIndex,
                         powerSaving = uiState.settings.powerSavingAnimation,
                     )
-                } else if (page != StandbyPage.Clock) {
-                    when (page) {
-                        StandbyPage.Widgets -> StandbyWidgetsPane(
-                            calendarPermissionGranted = calendarPermissionGranted,
-                            onRequestCalendarPermission = onRequestCalendarPermission,
-                            onOpenNotificationSettings = onOpenNotificationSettings,
-                        )
-                        StandbyPage.Calendar -> CalendarPage(
-                            permissionGranted = calendarPermissionGranted,
-                            onRequestPermission = onRequestCalendarPermission,
-                        )
-                        StandbyPage.Notifications -> NotificationsPage(
-                            onOpenNotificationSettings = onOpenNotificationSettings,
-                        )
-                        StandbyPage.Clock -> Unit
-                    }
                 } else if (uiState.settings.coverOnlyMode) {
                     CoverStandbyPane(
                         settings = uiState.settings,
                         battery = uiState.battery,
                         calendarPermissionGranted = calendarPermissionGranted,
                     )
-                } else if (uiState.dualScreenStatus == DualScreenStatus.Active) {
-                    AmbientPane(
-                        preset = uiState.settings.ambientPreset,
-                        colorValues = uiState.settings.customColors,
-                        primaryColorIndex = uiState.settings.ambientColorIndex,
-                        powerSaving = uiState.settings.powerSavingAnimation,
-                    )
                 } else {
-                    FoldAwareStandbyLayout(
-                        posture = posture,
-                        reverseVerticalPanes = reverse,
-                        clock = {
-                            ClockPane(
-                                settings = uiState.settings,
-                                battery = uiState.battery,
-                                burnInOffset = burnInOffset,
-                                nightTint = redNightMode,
-                            )
-                        },
-                        ambient = {
-                            AmbientPane(
-                                preset = uiState.settings.ambientPreset,
-                                colorValues = uiState.settings.customColors,
-                                primaryColorIndex = uiState.settings.ambientColorIndex,
-                                powerSaving = uiState.settings.powerSavingAnimation,
-                            )
-                        },
+                    NormalStandbyLayout(
+                        settings = uiState.settings,
+                        battery = uiState.battery,
+                        widgetPage = page.asWidgetPage(),
+                        burnInOffset = burnInOffset,
+                        nightTint = redNightMode,
+                        calendarPermissionGranted = calendarPermissionGranted,
+                        onRequestCalendarPermission = onRequestCalendarPermission,
+                        onOpenNotificationSettings = onOpenNotificationSettings,
                     )
                 }
             }
@@ -306,7 +279,7 @@ fun StandbyScreen(
                     text = if (uiState.dualScreenStatus == DualScreenStatus.Active) {
                         "듀얼 화면 · ${uiState.settings.ambientPreset.label}"
                     } else {
-                        "${uiState.foldPosture.readableName()} · ${uiState.page.label} · ${uiState.settings.ambientPreset.label}"
+                        "${uiState.foldPosture.readableName()} · 시계 ${uiState.settings.clockStyle.label} · ${uiState.page.asWidgetPage().label}"
                     },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
                     style = MaterialTheme.typography.labelLarge,
@@ -314,7 +287,7 @@ fun StandbyScreen(
             }
         }
 
-        PageIndicator(page = uiState.page, modifier = Modifier.align(Alignment.BottomCenter))
+        PageIndicator(page = uiState.page.asWidgetPage(), modifier = Modifier.align(Alignment.BottomCenter))
 
         AnimatedVisibility(
             visible = controlsVisible,
@@ -399,16 +372,29 @@ private fun StandbyControls(
                 )
                 Text("${(uiState.settings.brightness * 100).toInt()}%")
             }
-            Text(
-                "무드등 빠른 선택",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp),
-            )
-            QuickAmbientPresets(
-                selected = uiState.settings.ambientPreset,
-                onSelected = { preset -> onSettingsChange { it.copy(ambientPreset = preset) } },
-            )
+            if (uiState.dualScreenStatus == DualScreenStatus.Active) {
+                Text(
+                    "무드등 빠른 선택",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+                QuickAmbientPresets(
+                    selected = uiState.settings.ambientPreset,
+                    onSelected = { preset -> onSettingsChange { it.copy(ambientPreset = preset) } },
+                )
+            } else {
+                Text(
+                    "시계 스타일",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+                QuickClockStyles(
+                    selected = uiState.settings.clockStyle,
+                    onSelected = { style -> onSettingsChange { it.copy(clockStyle = style) } },
+                )
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
@@ -441,7 +427,11 @@ private fun QuickSettingsSheet(
             Column(Modifier.padding(start = 12.dp)) {
                 Text("빠른 설정", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "좌우 스와이프: 시계 · 위아래 스와이프: 무드등",
+                    if (uiState.dualScreenStatus == DualScreenStatus.Active) {
+                        "내부 화면: 무드등 · 커버 화면: 시계와 정보"
+                    } else {
+                        "좌우 스와이프: 시계 스타일 · 위아래 스와이프: 위젯"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -454,11 +444,19 @@ private fun QuickSettingsSheet(
             valueRange = 0.05f..1f,
             steps = 18,
         )
-        Text("무드등 빠른 선택", style = MaterialTheme.typography.titleSmall)
-        QuickAmbientPresets(
-            selected = uiState.settings.ambientPreset,
-            onSelected = { preset -> onSettingsChange { it.copy(ambientPreset = preset) } },
-        )
+        if (uiState.dualScreenStatus == DualScreenStatus.Active) {
+            Text("무드등 빠른 선택", style = MaterialTheme.typography.titleSmall)
+            QuickAmbientPresets(
+                selected = uiState.settings.ambientPreset,
+                onSelected = { preset -> onSettingsChange { it.copy(ambientPreset = preset) } },
+            )
+        } else {
+            Text("시계 스타일", style = MaterialTheme.typography.titleSmall)
+            QuickClockStyles(
+                selected = uiState.settings.clockStyle,
+                onSelected = { style -> onSettingsChange { it.copy(clockStyle = style) } },
+            )
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -477,20 +475,27 @@ private fun QuickSettingsSheet(
                 onCheckedChange = { checked -> onSettingsChange { it.copy(coverOnlyMode = checked) } },
             )
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            uiState.settings.customColors.take(6).forEachIndexed { index, value ->
-                Surface(
-                    onClick = { onSettingsChange { it.copy(ambientColorIndex = index) } },
-                    modifier = Modifier
-                        .size(42.dp)
-                        .semantics { contentDescription = "무드등 색상 ${index + 1}" },
-                    shape = CircleShape,
-                    color = Color(value),
-                    tonalElevation = if (index == uiState.settings.ambientColorIndex) 5.dp else 0.dp,
-                ) {}
+        if (uiState.dualScreenStatus == DualScreenStatus.Active) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                uiState.settings.customColors.take(6).forEachIndexed { index, value ->
+                    Surface(
+                        onClick = { onSettingsChange { it.copy(ambientColorIndex = index) } },
+                        modifier = Modifier
+                            .size(42.dp)
+                            .semantics { contentDescription = "무드등 색상 ${index + 1}" },
+                        shape = CircleShape,
+                        color = Color(value),
+                        tonalElevation = if (index == uiState.settings.ambientColorIndex) 5.dp else 0.dp,
+                    ) {}
+                }
+                Spacer(Modifier.weight(1f))
+                Button(onClick = onExit) {
+                    Icon(Icons.Default.FullscreenExit, contentDescription = null)
+                    Text("스탠바이 종료", modifier = Modifier.padding(start = 8.dp))
+                }
             }
-            Spacer(Modifier.weight(1f))
-            Button(onClick = onExit) {
+        } else {
+            Button(onClick = onExit, modifier = Modifier.align(Alignment.End)) {
                 Icon(Icons.Default.FullscreenExit, contentDescription = null)
                 Text("스탠바이 종료", modifier = Modifier.padding(start = 8.dp))
             }
@@ -543,6 +548,128 @@ private fun QuickAmbientPresets(
 }
 
 @Composable
+private fun QuickClockStyles(
+    selected: ClockStyle,
+    onSelected: (ClockStyle) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ClockStyle.entries.forEach { style ->
+            Surface(
+                onClick = { onSelected(style) },
+                shape = RoundedCornerShape(50),
+                color = if (selected == style) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                } else {
+                    Color.White.copy(alpha = 0.08f)
+                },
+                border = if (selected == style) {
+                    BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                } else {
+                    null
+                },
+            ) {
+                Text(
+                    text = style.label,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+            }
+        }
+    }
+}
+
+private fun StandbyPage.asWidgetPage(): StandbyPage =
+    if (this == StandbyPage.Clock) StandbyPage.Widgets else this
+
+@Composable
+private fun NormalStandbyLayout(
+    settings: StandbySettings,
+    battery: BatteryState,
+    widgetPage: StandbyPage,
+    burnInOffset: Offset,
+    nightTint: Boolean,
+    calendarPermissionGranted: Boolean,
+    onRequestCalendarPermission: () -> Unit,
+    onOpenNotificationSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize().padding(16.dp)) {
+        val horizontal = maxWidth >= maxHeight * 0.78f
+        if (horizontal) {
+            Row(
+                Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box(Modifier.weight(0.52f).fillMaxSize()) {
+                    ClockPane(
+                        settings = settings,
+                        battery = battery,
+                        burnInOffset = burnInOffset,
+                        nightTint = nightTint,
+                    )
+                }
+                Box(Modifier.weight(0.48f).fillMaxSize()) {
+                    NormalWidgetPane(
+                        page = widgetPage,
+                        calendarPermissionGranted = calendarPermissionGranted,
+                        onRequestCalendarPermission = onRequestCalendarPermission,
+                        onOpenNotificationSettings = onOpenNotificationSettings,
+                    )
+                }
+            }
+        } else {
+            Column(
+                Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(Modifier.fillMaxWidth().weight(0.54f)) {
+                    ClockPane(
+                        settings = settings,
+                        battery = battery,
+                        burnInOffset = burnInOffset,
+                        nightTint = nightTint,
+                    )
+                }
+                Box(Modifier.fillMaxWidth().weight(0.46f)) {
+                    NormalWidgetPane(
+                        page = widgetPage,
+                        calendarPermissionGranted = calendarPermissionGranted,
+                        onRequestCalendarPermission = onRequestCalendarPermission,
+                        onOpenNotificationSettings = onOpenNotificationSettings,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NormalWidgetPane(
+    page: StandbyPage,
+    calendarPermissionGranted: Boolean,
+    onRequestCalendarPermission: () -> Unit,
+    onOpenNotificationSettings: () -> Unit,
+) {
+    when (page) {
+        StandbyPage.Widgets -> StandbyWidgetsPane(
+            calendarPermissionGranted = calendarPermissionGranted,
+            onRequestCalendarPermission = onRequestCalendarPermission,
+            onOpenNotificationSettings = onOpenNotificationSettings,
+        )
+        StandbyPage.Calendar -> CalendarPage(
+            permissionGranted = calendarPermissionGranted,
+            onRequestPermission = onRequestCalendarPermission,
+        )
+        StandbyPage.Notifications -> NotificationsPage(
+            onOpenNotificationSettings = onOpenNotificationSettings,
+        )
+        StandbyPage.Clock -> Unit
+    }
+}
+
+@Composable
 private fun PageIndicator(page: StandbyPage, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier.padding(bottom = 12.dp),
@@ -557,34 +684,6 @@ private fun PageIndicator(page: StandbyPage, modifier: Modifier = Modifier) {
                         CircleShape,
                     ),
             )
-        }
-    }
-}
-
-@Composable
-private fun FoldAwareStandbyLayout(
-    posture: FoldPosture,
-    reverseVerticalPanes: Boolean,
-    clock: @Composable () -> Unit,
-    ambient: @Composable () -> Unit,
-) {
-    Layout(
-        content = {
-            Box(Modifier.fillMaxSize().clipToBounds()) { clock() }
-            Box(Modifier.fillMaxSize().clipToBounds()) { ambient() }
-        },
-        modifier = Modifier.fillMaxSize(),
-    ) { measurables, constraints ->
-        val width = constraints.maxWidth.coerceAtLeast(1)
-        val height = constraints.maxHeight.coerceAtLeast(1)
-        val arrangement = FoldLayoutCalculator.calculate(width, height, posture, reverseVerticalPanes)
-        val clockRect = arrangement.clock
-        val ambientRect = arrangement.ambient
-        val clockPlaceable = measurables[0].measure(Constraints.fixed(clockRect.width, clockRect.height))
-        val ambientPlaceable = measurables[1].measure(Constraints.fixed(ambientRect.width, ambientRect.height))
-        layout(width, height) {
-            clockPlaceable.place(clockRect.left, clockRect.top)
-            ambientPlaceable.place(ambientRect.left, ambientRect.top)
         }
     }
 }

@@ -37,11 +37,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.State
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,9 +49,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
 import com.blossom.foldstand.BuildConfig
 import com.blossom.foldstand.data.CalendarRepository
 import com.blossom.foldstand.data.NotificationRepository
@@ -69,6 +65,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 private val CardShape = RoundedCornerShape(28.dp)
@@ -198,19 +196,38 @@ fun StandbyWidgetsPane(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text("위젯", color = SecondaryText, style = MaterialTheme.typography.labelLarge)
-        Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            CalendarWidgetCard(
-                events = events,
-                calendarPermissionGranted = calendarPermissionGranted,
-                onRequestPermission = onRequestCalendarPermission,
-                modifier = Modifier.weight(1f),
-            )
-            NotificationWidgetCard(
-                notifications = notifications,
-                available = BuildConfig.NOTIFICATION_ACCESS_AVAILABLE,
-                onOpenSettings = onOpenNotificationSettings,
-                modifier = Modifier.weight(1f),
-            )
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+            if (maxWidth < 520.dp) {
+                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CalendarWidgetCard(
+                        events = events,
+                        calendarPermissionGranted = calendarPermissionGranted,
+                        onRequestPermission = onRequestCalendarPermission,
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                    )
+                    NotificationWidgetCard(
+                        notifications = notifications,
+                        available = BuildConfig.NOTIFICATION_ACCESS_AVAILABLE,
+                        onOpenSettings = onOpenNotificationSettings,
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                    )
+                }
+            } else {
+                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    CalendarWidgetCard(
+                        events = events,
+                        calendarPermissionGranted = calendarPermissionGranted,
+                        onRequestPermission = onRequestCalendarPermission,
+                        modifier = Modifier.weight(1f),
+                    )
+                    NotificationWidgetCard(
+                        notifications = notifications,
+                        available = BuildConfig.NOTIFICATION_ACCESS_AVAILABLE,
+                        onOpenSettings = onOpenNotificationSettings,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
         }
     }
 }
@@ -442,46 +459,30 @@ private fun MonthGrid(month: YearMonth, today: LocalDate) {
 }
 
 @Composable
-private fun rememberUpcomingEvents(context: Context, permissionGranted: Boolean): androidx.compose.runtime.State<List<CalendarEvent>> {
-    val state = remember(permissionGranted) { mutableStateOf(emptyList<CalendarEvent>()) }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(permissionGranted, lifecycle) {
-        if (!permissionGranted) {
-            state.value = emptyList()
-            return@LaunchedEffect
-        }
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                state.value = withContext(Dispatchers.IO) { CalendarRepository.readUpcoming(context) }
-                kotlinx.coroutines.delay(60_000L)
+private fun rememberUpcomingEvents(context: Context, permissionGranted: Boolean): State<List<CalendarEvent>> =
+    produceState(emptyList(), context, permissionGranted) {
+        if (!permissionGranted) return@produceState
+        while (isActive) {
+            value = withContext(Dispatchers.IO) {
+                runCatching { CalendarRepository.readUpcoming(context) }.getOrDefault(emptyList())
             }
+            delay(60_000L)
         }
-    }
-    return state
 }
 
 @Composable
 private fun rememberNotifications(
     context: Context,
     enabled: Boolean,
-): androidx.compose.runtime.State<List<NotificationItem>> {
-    val state = remember(enabled) {
-        mutableStateOf(if (enabled) NotificationRepository.read(context) else emptyList())
-    }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(enabled, lifecycle) {
-        if (!enabled) {
-            state.value = emptyList()
-            return@LaunchedEffect
-        }
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                state.value = withContext(Dispatchers.IO) { NotificationRepository.read(context) }
-                kotlinx.coroutines.delay(5_000L)
+): State<List<NotificationItem>> =
+    produceState(if (enabled) emptyList() else emptyList(), context, enabled) {
+        if (!enabled) return@produceState
+        while (isActive) {
+            value = withContext(Dispatchers.IO) {
+                runCatching { NotificationRepository.read(context) }.getOrDefault(emptyList())
             }
+            delay(5_000L)
         }
-    }
-    return state
 }
 
 private fun formatEventTime(event: CalendarEvent): String {

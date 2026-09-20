@@ -91,7 +91,15 @@ class FoldStandViewModel(
     }
 
     fun movePage(direction: Int) {
-        page.value = page.value.next(direction)
+        // In normal StandBy, the clock is the fixed left pane and the
+        // right-hand widget starts at the Widgets page. Start cycling from
+        // that widget page so the first vertical swipe visibly changes it.
+        val currentWidgetPage = if (page.value == StandbyPage.Clock) {
+            StandbyPage.Widgets
+        } else {
+            page.value
+        }
+        page.value = currentWidgetPage.next(direction)
     }
 
     fun checkForUpdates() = appUpdateRepository.checkForLatest()

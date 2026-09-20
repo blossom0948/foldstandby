@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,7 +34,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -47,7 +48,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -309,15 +309,14 @@ private fun UpdateCard(
 
 @Composable
 private fun StandbyPreview(uiState: StandbyUiState, modifier: Modifier = Modifier) {
-    val colors = uiState.settings.customColors.map(::Color)
     Card(
         modifier = modifier.height(260.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF141414)),
     ) {
-        Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxSize()) {
             Box(
-                modifier = Modifier.fillMaxWidth().weight(1f),
+                modifier = Modifier.weight(0.54f).fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -337,24 +336,32 @@ private fun StandbyPreview(uiState: StandbyUiState, modifier: Modifier = Modifie
                     )
                 }
             }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
             Box(
+                Modifier
+                    .width(1.dp)
+                    .fillMaxHeight()
+                    .background(Color.White.copy(alpha = 0.08f)),
+            )
+            Surface(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(colors.getOrElse(0) { Color(0xFF355C7D) }, colors.getOrElse(2) { Color(0xFFC06C84) }),
-                        ),
-                    ),
-                contentAlignment = Alignment.BottomStart,
+                    .weight(0.46f)
+                    .fillMaxSize()
+                    .padding(10.dp),
+                shape = RoundedCornerShape(18.dp),
+                color = Color(0xFF1C1C1E),
             ) {
-                Text(
-                    "${uiState.settings.clockStyle.label} · ${uiState.settings.ambientPreset.label}",
-                    modifier = Modifier.padding(14.dp),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.White.copy(alpha = 0.88f),
-                )
+                Column(
+                    Modifier.fillMaxSize().padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text("위젯", color = Color(0xFFC6C6C6), style = MaterialTheme.typography.labelLarge)
+                    Text("다음 일정", color = Color(0xFFC6C6C6), style = MaterialTheme.typography.labelSmall)
+                    Text("일정 없음", style = MaterialTheme.typography.titleMedium)
+                    Text("알람", color = Color(0xFFC6C6C6), style = MaterialTheme.typography.labelSmall)
+                    Text("07:00", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.weight(1f))
+                    Text("위아래 스와이프: 위젯 변경", color = Color(0xFFC6C6C6), style = MaterialTheme.typography.labelSmall)
+                }
             }
         }
     }
