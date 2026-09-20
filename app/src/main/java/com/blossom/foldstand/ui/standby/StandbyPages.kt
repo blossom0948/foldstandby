@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -56,7 +57,10 @@ import com.blossom.foldstand.BuildConfig
 import com.blossom.foldstand.data.CalendarRepository
 import com.blossom.foldstand.data.NotificationRepository
 import com.blossom.foldstand.domain.CalendarEvent
+import com.blossom.foldstand.domain.BatteryState
 import com.blossom.foldstand.domain.NotificationItem
+import com.blossom.foldstand.domain.NightModeOption
+import com.blossom.foldstand.domain.StandbySettings
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -69,7 +73,115 @@ import kotlinx.coroutines.withContext
 
 private val CardShape = RoundedCornerShape(28.dp)
 private val CardColor = Color(0xFF171717)
-private val SecondaryText = Color(0xFF9D9D9D)
+private val SecondaryText = Color(0xFFC6C6C6)
+
+/** A glanceable cover-screen composition inspired by StandBy's clock + widget pair. */
+@Composable
+fun CoverStandbyPane(
+    settings: StandbySettings,
+    battery: BatteryState,
+    calendarPermissionGranted: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val events by rememberUpcomingEvents(context, calendarPermissionGranted)
+    val notifications by rememberNotifications(context, BuildConfig.NOTIFICATION_ACCESS_AVAILABLE)
+    val ambientLux by rememberAmbientLux(settings.nightMode == NightModeOption.Auto)
+    val darkEnvironment = ambientLux?.let { it < 12f }
+        ?: (java.time.LocalTime.now().hour >= 22 || java.time.LocalTime.now().hour < 7)
+    val nightTint = when (settings.nightMode) {
+        NightModeOption.On -> true
+        NightModeOption.Off -> false
+        NightModeOption.Auto -> darkEnvironment
+    }
+    BoxWithConstraints(modifier = modifier.fillMaxSize().padding(18.dp)) {
+        val narrow = maxWidth < maxHeight * 0.82f
+        if (narrow) {
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.fillMaxWidth().weight(0.62f)) {
+                    ClockPane(settings = settings, battery = battery, nightTint = nightTint)
+                }
+                CoverInfoRow(battery, events, notifications, Modifier.weight(0.38f))
+            }
+        } else {
+            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Box(Modifier.weight(0.62f).fillMaxSize()) {
+                    ClockPane(settings = settings, battery = battery, nightTint = nightTint)
+                }
+                CoverInfoColumn(settings, battery, events, notifications, Modifier.weight(0.38f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoverInfoRow(
+    battery: BatteryState,
+    events: List<CalendarEvent>,
+    notifications: List<NotificationItem>,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        CoverInfoCard(
+            title = "다음 일정",
+            value = events.firstOrNull()?.title ?: "일정 없음",
+            modifier = Modifier.weight(1f),
+        )
+        CoverInfoCard(
+            title = "알림 · 배터리",
+            value = "${notifications.size}개 · ${battery.percent?.let { "$it%" } ?: "—"}",
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun CoverInfoColumn(
+    settings: StandbySettings,
+    battery: BatteryState,
+    events: List<CalendarEvent>,
+    notifications: List<NotificationItem>,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        CoverInfoCard(
+            title = "다음 일정",
+            value = events.firstOrNull()?.let { "${it.title}\n${formatEventTime(it)}" } ?: "일정 없음",
+            modifier = Modifier.fillMaxWidth().weight(1f),
+        )
+        CoverInfoCard(
+            title = "다음 알람",
+            value = if (settings.alarmEnabled) "%02d:%02d".format(settings.alarmHour, settings.alarmMinute) else "꺼짐",
+            modifier = Modifier.fillMaxWidth().weight(1f),
+        )
+        CoverInfoCard(
+            title = "알림 · 배터리",
+            value = "${notifications.size}개 · ${battery.percent?.let { "$it%" } ?: "—"}",
+            modifier = Modifier.fillMaxWidth().weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun CoverInfoCard(title: String, value: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(22.dp),
+        color = Color(0xFF1C1C1E),
+        tonalElevation = 2.dp,
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(title, color = SecondaryText, style = MaterialTheme.typography.labelMedium)
+            Text(
+                value,
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
 
 @Composable
 fun StandbyWidgetsPane(

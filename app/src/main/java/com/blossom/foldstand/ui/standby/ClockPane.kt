@@ -90,7 +90,7 @@ fun ClockPane(
             .coerceIn(90f, 340f)
         val minimal = settings.clockStyle == ClockStyle.Minimal
         val timeColor = if (nightTint) Color(0xFFFF6B6B) else Color(0xFFF5F5F5)
-        val secondaryColor = if (nightTint) Color(0xFFE06B6B) else Color(0xFFA6A6A6)
+        val secondaryColor = if (nightTint) Color(0xFFE06B6B) else Color(0xFFC6C6C6)
         Column(
             modifier = Modifier.padding(
                 start = (20 + burnInOffset.x).dp,

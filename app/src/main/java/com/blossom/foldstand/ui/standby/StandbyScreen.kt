@@ -5,10 +5,17 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -24,10 +31,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Brightness6
+import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Settings
@@ -44,6 +54,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -52,6 +63,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,6 +87,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.blossom.foldstand.domain.DualScreenStatus
+import com.blossom.foldstand.domain.AmbientPreset
 import com.blossom.foldstand.domain.FoldPosture
 import com.blossom.foldstand.domain.StandbySettings
 import com.blossom.foldstand.domain.StandbyPage
@@ -104,6 +117,7 @@ fun StandbyScreen(
     var settingsSheetVisible by remember { mutableStateOf(false) }
     var exitConfirmationVisible by remember { mutableStateOf(false) }
     var interactionNonce by remember { mutableLongStateOf(0L) }
+    var pageDirection by remember { mutableIntStateOf(1) }
     var isDimmed by remember { mutableStateOf(false) }
     var dragTotal by remember { mutableStateOf(Offset.Zero) }
     val ambientLux by rememberAmbientLux(uiState.settings.nightMode == NightModeOption.Auto)
@@ -164,8 +178,10 @@ fun StandbyScreen(
                 onDragEnd = {
                     val threshold = 64.dp.toPx()
                     when {
-                        abs(dragTotal.x) > abs(dragTotal.y) && abs(dragTotal.x) > threshold ->
-                            onPageChange(if (dragTotal.x < 0) 1 else -1)
+                        abs(dragTotal.x) > abs(dragTotal.y) && abs(dragTotal.x) > threshold -> {
+                            pageDirection = if (dragTotal.x < 0) 1 else -1
+                            onPageChange(pageDirection)
+                        }
                         abs(dragTotal.y) > threshold ->
                             onCycleAmbientPreset(if (dragTotal.y < 0) 1 else -1)
                     }
@@ -187,50 +203,73 @@ fun StandbyScreen(
             label = "fold posture transition",
             modifier = Modifier.fillMaxSize(),
         ) { (posture, reverse) ->
-            if (uiState.page != StandbyPage.Clock) {
-                when (uiState.page) {
-                    StandbyPage.Widgets -> StandbyWidgetsPane(
+            AnimatedContent(
+                targetState = uiState.page,
+                transitionSpec = {
+                    val forward = pageDirection > 0
+                    (slideInHorizontally(
+                        animationSpec = tween(260),
+                        initialOffsetX = { width -> if (forward) width else -width },
+                    ) + fadeIn(tween(220))) togetherWith
+                        (slideOutHorizontally(
+                            animationSpec = tween(220),
+                            targetOffsetX = { width -> if (forward) -width / 3 else width / 3 },
+                        ) + fadeOut(tween(160)))
+                },
+                label = "standby horizontal page transition",
+                modifier = Modifier.fillMaxSize(),
+            ) { page ->
+                if (page != StandbyPage.Clock) {
+                    when (page) {
+                        StandbyPage.Widgets -> StandbyWidgetsPane(
+                            calendarPermissionGranted = calendarPermissionGranted,
+                            onRequestCalendarPermission = onRequestCalendarPermission,
+                            onOpenNotificationSettings = onOpenNotificationSettings,
+                        )
+                        StandbyPage.Calendar -> CalendarPage(
+                            permissionGranted = calendarPermissionGranted,
+                            onRequestPermission = onRequestCalendarPermission,
+                        )
+                        StandbyPage.Notifications -> NotificationsPage(
+                            onOpenNotificationSettings = onOpenNotificationSettings,
+                        )
+                        StandbyPage.Clock -> Unit
+                    }
+                } else if (uiState.settings.coverOnlyMode) {
+                    CoverStandbyPane(
+                        settings = uiState.settings,
+                        battery = uiState.battery,
                         calendarPermissionGranted = calendarPermissionGranted,
-                        onRequestCalendarPermission = onRequestCalendarPermission,
-                        onOpenNotificationSettings = onOpenNotificationSettings,
                     )
-                    StandbyPage.Calendar -> CalendarPage(
-                        permissionGranted = calendarPermissionGranted,
-                        onRequestPermission = onRequestCalendarPermission,
+                } else if (uiState.dualScreenStatus == DualScreenStatus.Active) {
+                    AmbientPane(
+                        preset = uiState.settings.ambientPreset,
+                        colorValues = uiState.settings.customColors,
+                        primaryColorIndex = uiState.settings.ambientColorIndex,
+                        powerSaving = uiState.settings.powerSavingAnimation,
                     )
-                    StandbyPage.Notifications -> NotificationsPage(
-                        onOpenNotificationSettings = onOpenNotificationSettings,
+                } else {
+                    FoldAwareStandbyLayout(
+                        posture = posture,
+                        reverseVerticalPanes = reverse,
+                        clock = {
+                            ClockPane(
+                                settings = uiState.settings,
+                                battery = uiState.battery,
+                                burnInOffset = burnInOffset,
+                                nightTint = redNightMode,
+                            )
+                        },
+                        ambient = {
+                            AmbientPane(
+                                preset = uiState.settings.ambientPreset,
+                                colorValues = uiState.settings.customColors,
+                                primaryColorIndex = uiState.settings.ambientColorIndex,
+                                powerSaving = uiState.settings.powerSavingAnimation,
+                            )
+                        },
                     )
-                    StandbyPage.Clock -> Unit
                 }
-            } else if (uiState.dualScreenStatus == DualScreenStatus.Active) {
-                AmbientPane(
-                    preset = uiState.settings.ambientPreset,
-                    colorValues = uiState.settings.customColors,
-                    primaryColorIndex = uiState.settings.ambientColorIndex,
-                    powerSaving = uiState.settings.powerSavingAnimation,
-                )
-            } else {
-                FoldAwareStandbyLayout(
-                    posture = posture,
-                    reverseVerticalPanes = reverse,
-                    clock = {
-                        ClockPane(
-                            settings = uiState.settings,
-                            battery = uiState.battery,
-                            burnInOffset = burnInOffset,
-                            nightTint = redNightMode,
-                        )
-                    },
-                    ambient = {
-                        AmbientPane(
-                            preset = uiState.settings.ambientPreset,
-                            colorValues = uiState.settings.customColors,
-                            primaryColorIndex = uiState.settings.ambientColorIndex,
-                            powerSaving = uiState.settings.powerSavingAnimation,
-                        )
-                    },
-                )
             }
         }
 
@@ -270,6 +309,7 @@ fun StandbyScreen(
             StandbyControls(
                 uiState = uiState,
                 onBrightness = { value -> onSettingsChange { it.copy(brightness = value) } },
+                onSettingsChange = onSettingsChange,
                 onOpenSettings = onOpenSettings,
                 onExit = { exitConfirmationVisible = true },
                 modifier = Modifier.navigationBarsPadding(),
@@ -315,6 +355,7 @@ fun StandbyScreen(
 private fun StandbyControls(
     uiState: StandbyUiState,
     onBrightness: (Float) -> Unit,
+    onSettingsChange: ((StandbySettings) -> StandbySettings) -> Unit,
     onOpenSettings: () -> Unit,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
@@ -344,6 +385,16 @@ private fun StandbyControls(
                 )
                 Text("${(uiState.settings.brightness * 100).toInt()}%")
             }
+            Text(
+                "무드등 빠른 선택",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            QuickAmbientPresets(
+                selected = uiState.settings.ambientPreset,
+                onSelected = { preset -> onSettingsChange { it.copy(ambientPreset = preset) } },
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
@@ -389,12 +440,35 @@ private fun QuickSettingsSheet(
             valueRange = 0.05f..1f,
             steps = 18,
         )
+        Text("무드등 빠른 선택", style = MaterialTheme.typography.titleSmall)
+        QuickAmbientPresets(
+            selected = uiState.settings.ambientPreset,
+            onSelected = { preset -> onSettingsChange { it.copy(ambientPreset = preset) } },
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column {
+                Text("커버 화면 정보 모드")
+                Text(
+                    "시계·일정·알림을 크게 표시하고 무드등을 숨깁니다.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = uiState.settings.coverOnlyMode,
+                onCheckedChange = { checked -> onSettingsChange { it.copy(coverOnlyMode = checked) } },
+            )
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            uiState.settings.customColors.take(3).forEachIndexed { index, value ->
+            uiState.settings.customColors.take(6).forEachIndexed { index, value ->
                 Surface(
                     onClick = { onSettingsChange { it.copy(ambientColorIndex = index) } },
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(42.dp)
                         .semantics { contentDescription = "무드등 색상 ${index + 1}" },
                     shape = CircleShape,
                     color = Color(value),
@@ -405,6 +479,50 @@ private fun QuickSettingsSheet(
             Button(onClick = onExit) {
                 Icon(Icons.Default.FullscreenExit, contentDescription = null)
                 Text("스탠바이 종료", modifier = Modifier.padding(start = 8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickAmbientPresets(
+    selected: AmbientPreset,
+    onSelected: (AmbientPreset) -> Unit,
+) {
+    val presets = listOf(
+        AmbientPreset.White,
+        AmbientPreset.Aurora,
+        AmbientPreset.Spectrum,
+        AmbientPreset.Sunset,
+        AmbientPreset.Candle,
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        presets.forEach { preset ->
+            val previewColor = when (preset) {
+                AmbientPreset.White -> Color.White
+                AmbientPreset.Aurora -> Color(0xFF5DDAA5)
+                AmbientPreset.Spectrum -> Color(0xFF635BFF)
+                AmbientPreset.Sunset -> Color(0xFFE27D5F)
+                AmbientPreset.Candle -> Color(0xFFFFC857)
+                else -> MaterialTheme.colorScheme.primary
+            }
+            Surface(
+                onClick = { onSelected(preset) },
+                shape = RoundedCornerShape(50),
+                color = if (selected == preset) previewColor.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.08f),
+                border = if (selected == preset) BorderStroke(1.dp, previewColor) else null,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                ) {
+                    Box(Modifier.size(12.dp).background(previewColor, CircleShape))
+                    Text(preset.label)
+                }
             }
         }
     }

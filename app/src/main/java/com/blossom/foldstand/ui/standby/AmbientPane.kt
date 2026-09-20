@@ -35,7 +35,7 @@ fun AmbientPane(
     val colors = remember(colorValues, primaryColorIndex) {
         val safe = if (colorValues.size >= 3) colorValues else DEFAULT_AMBIENT_COLORS
         val primary = primaryColorIndex.coerceIn(0, safe.lastIndex)
-        val ordered = listOf(safe[primary]) + safe.indices.filter { it != primary }.map { safe[it] }.take(2)
+        val ordered = listOf(safe[primary]) + safe.indices.filter { it != primary }.map { safe[it] }.take(5)
         ordered.map(::Color)
     }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -63,6 +63,16 @@ fun AmbientPane(
     Canvas(modifier = modifier.fillMaxSize()) {
         drawRect(Color.Black)
         when (preset) {
+            AmbientPreset.White -> {
+                drawRect(Color.White.copy(alpha = 0.82f))
+                drawRect(
+                    Brush.verticalGradient(
+                        0f to Color.White.copy(alpha = 0.08f),
+                        0.62f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = 0.34f),
+                    ),
+                )
+            }
             AmbientPreset.Solid -> {
                 drawRect(colors[0].copy(alpha = 0.78f))
                 drawRect(
@@ -117,6 +127,26 @@ fun AmbientPane(
                         listOf(Color.Black.copy(alpha = 0.12f), Color.Black.copy(alpha = 0.38f)),
                     ),
                 )
+            }
+            AmbientPreset.Spectrum -> {
+                val spectrum = listOf(
+                    Color(0xFFFF4D6D),
+                    Color(0xFFFFC857),
+                    Color(0xFF4DFFB8),
+                    Color(0xFF45C6FF),
+                    Color(0xFF635BFF),
+                    Color(0xFFFF4DDA),
+                )
+                val shift = sin(phase * 2f * PI).toFloat() * size.width * 0.16f
+                drawRect(
+                    Brush.linearGradient(
+                        colors = spectrum,
+                        start = Offset(shift, size.height),
+                        end = Offset(size.width - shift, 0f),
+                    ),
+                )
+                drawRect(Color.White.copy(alpha = 0.06f))
+                drawRect(Color.Black.copy(alpha = 0.18f))
             }
             AmbientPreset.Sunset -> {
                 val shift = sin(phase * 2f * PI).toFloat() * size.width * 0.12f

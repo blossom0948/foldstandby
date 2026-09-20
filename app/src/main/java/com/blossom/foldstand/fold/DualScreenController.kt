@@ -22,8 +22,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalWindowApi::class)
@@ -57,9 +59,15 @@ class DualScreenController(
                         areaInfo = null
                         _status.value = DualScreenStatus.Error(error.message ?: "capability 확인 실패")
                     }
-                    .collect { info ->
+                    .collectLatest { info ->
                         areaInfo = info
-                        _status.value = info?.getCapability(PRESENT_OPERATION)?.status.toDomainStatus()
+                        // Foldable OEMs often publish transient unavailable/active
+                        // snapshots while the hinge settles. Debouncing here keeps
+                        // the home action stable instead of flickering on every frame.
+                        delay(CAPABILITY_SETTLE_MILLIS)
+                        if (session == null && !requestInFlight) {
+                            _status.value = info?.getCapability(PRESENT_OPERATION)?.status.toDomainStatus()
+                        }
                     }
                 }
             }
@@ -177,8 +185,16 @@ class DualScreenController(
         }
     }
 
-    private fun capabilityStatus(): DualScreenStatus =
-        areaInfo?.getCapability(PRESENT_OPERATION)?.status.toDomainStatus()
+    private fun capabilityStatus(): DualScreenStatus {
+        val status = areaInfo?.getCapability(PRESENT_OPERATION)?.status.toDomainStatus()
+        // WindowArea can keep reporting ACTIVE for a short period after the
+        // presenter callback ended. With no local session, it is requestable again.
+        return if (session == null && status == DualScreenStatus.Active) {
+            DualScreenStatus.Available
+        } else {
+            status
+        }
+    }
 
     /**
      * Some implementations expose more than one rear-facing area while a fold is moving.
@@ -208,6 +224,7 @@ class DualScreenController(
 
     private companion object {
         const val TAG = "FoldStandDualScreen"
+        const val CAPABILITY_SETTLE_MILLIS = 240L
         val PRESENT_OPERATION = WindowAreaCapability.Operation.OPERATION_PRESENT_ON_AREA
     }
 }

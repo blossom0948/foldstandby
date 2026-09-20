@@ -53,12 +53,21 @@ class SettingsRepository(
         reverseVerticalPanes = preferences[Keys.reverseVerticalPanes] ?: false,
         suggestWhenCharging = preferences[Keys.suggestWhenCharging] ?: false,
         suggestWhenHalfOpened = preferences[Keys.suggestWhenHalfOpened] ?: false,
+        coverOnlyMode = preferences[Keys.coverOnlyMode] ?: false,
         customColors = listOf(
             preferences[Keys.color1] ?: DEFAULT_AMBIENT_COLORS[0],
             preferences[Keys.color2] ?: DEFAULT_AMBIENT_COLORS[1],
             preferences[Keys.color3] ?: DEFAULT_AMBIENT_COLORS[2],
+            preferences[Keys.color4] ?: DEFAULT_AMBIENT_COLORS[3],
+            preferences[Keys.color5] ?: DEFAULT_AMBIENT_COLORS[4],
+            preferences[Keys.color6] ?: DEFAULT_AMBIENT_COLORS[5],
         ),
-        ambientColorIndex = (preferences[Keys.ambientColorIndex] ?: 0).coerceIn(0, 2),
+        ambientColorIndex = (preferences[Keys.ambientColorIndex] ?: 0).coerceIn(0, 5),
+        alarmEnabled = preferences[Keys.alarmEnabled] ?: false,
+        alarmHour = (preferences[Keys.alarmHour] ?: 7).coerceIn(0, 23),
+        alarmMinute = (preferences[Keys.alarmMinute] ?: 0).coerceIn(0, 59),
+        alarmLabel = preferences[Keys.alarmLabel] ?: "FoldStand 알람",
+        alarmRingtoneUri = preferences[Keys.alarmRingtoneUri],
         isRunning = preferences[Keys.isRunning] ?: false,
         hasSeenManualStartNotice = preferences[Keys.hasSeenManualStartNotice] ?: false,
     )
@@ -79,10 +88,20 @@ class SettingsRepository(
         preferences[Keys.reverseVerticalPanes] = value.reverseVerticalPanes
         preferences[Keys.suggestWhenCharging] = value.suggestWhenCharging
         preferences[Keys.suggestWhenHalfOpened] = value.suggestWhenHalfOpened
+        preferences[Keys.coverOnlyMode] = value.coverOnlyMode
         preferences[Keys.color1] = value.customColors.getOrElse(0) { DEFAULT_AMBIENT_COLORS[0] }
         preferences[Keys.color2] = value.customColors.getOrElse(1) { DEFAULT_AMBIENT_COLORS[1] }
         preferences[Keys.color3] = value.customColors.getOrElse(2) { DEFAULT_AMBIENT_COLORS[2] }
-        preferences[Keys.ambientColorIndex] = value.ambientColorIndex.coerceIn(0, 2)
+        preferences[Keys.color4] = value.customColors.getOrElse(3) { DEFAULT_AMBIENT_COLORS[3] }
+        preferences[Keys.color5] = value.customColors.getOrElse(4) { DEFAULT_AMBIENT_COLORS[4] }
+        preferences[Keys.color6] = value.customColors.getOrElse(5) { DEFAULT_AMBIENT_COLORS[5] }
+        preferences[Keys.ambientColorIndex] = value.ambientColorIndex.coerceIn(0, 5)
+        preferences[Keys.alarmEnabled] = value.alarmEnabled
+        preferences[Keys.alarmHour] = value.alarmHour.coerceIn(0, 23)
+        preferences[Keys.alarmMinute] = value.alarmMinute.coerceIn(0, 59)
+        preferences[Keys.alarmLabel] = value.alarmLabel.take(80)
+        value.alarmRingtoneUri?.let { preferences[Keys.alarmRingtoneUri] = it }
+            ?: preferences.remove(Keys.alarmRingtoneUri)
         preferences[Keys.isRunning] = value.isRunning
         preferences[Keys.hasSeenManualStartNotice] = value.hasSeenManualStartNotice
     }
@@ -116,10 +135,19 @@ class SettingsRepository(
         val reverseVerticalPanes = booleanPreferencesKey("reverse_vertical_panes")
         val suggestWhenCharging = booleanPreferencesKey("suggest_when_charging")
         val suggestWhenHalfOpened = booleanPreferencesKey("suggest_when_half_opened")
+        val coverOnlyMode = booleanPreferencesKey("cover_only_mode")
         val color1 = longPreferencesKey("ambient_color_1")
         val color2 = longPreferencesKey("ambient_color_2")
         val color3 = longPreferencesKey("ambient_color_3")
+        val color4 = longPreferencesKey("ambient_color_4")
+        val color5 = longPreferencesKey("ambient_color_5")
+        val color6 = longPreferencesKey("ambient_color_6")
         val ambientColorIndex = intPreferencesKey("ambient_color_index")
+        val alarmEnabled = booleanPreferencesKey("alarm_enabled")
+        val alarmHour = intPreferencesKey("alarm_hour")
+        val alarmMinute = intPreferencesKey("alarm_minute")
+        val alarmLabel = stringPreferencesKey("alarm_label")
+        val alarmRingtoneUri = stringPreferencesKey("alarm_ringtone_uri")
         val isRunning = booleanPreferencesKey("standby_running")
         val hasSeenManualStartNotice = booleanPreferencesKey("seen_manual_start_notice")
     }

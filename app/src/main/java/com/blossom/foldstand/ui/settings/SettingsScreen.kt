@@ -1,5 +1,8 @@
 package com.blossom.foldstand.ui.settings
 
+import android.app.TimePickerDialog
+import android.graphics.Color as AndroidColor
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -26,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -40,16 +44,23 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -60,6 +71,7 @@ import com.blossom.foldstand.data.UpdateState
 import com.blossom.foldstand.domain.AmbientPreset
 import com.blossom.foldstand.domain.AutoDimOption
 import com.blossom.foldstand.domain.ClockStyle
+import com.blossom.foldstand.domain.DEFAULT_AMBIENT_COLORS
 import com.blossom.foldstand.domain.DualScreenStatus
 import com.blossom.foldstand.domain.StandbySettings
 import com.blossom.foldstand.domain.NightModeOption
@@ -79,6 +91,8 @@ fun SettingsScreen(
     onCheckForUpdates: () -> Unit = {},
     onDownloadUpdate: () -> Unit = {},
     onInstallUpdate: (File) -> Unit = {},
+    onPickAlarmRingtone: () -> Unit = {},
+    onRequestAlarmNotificationPermission: () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -127,32 +141,44 @@ fun SettingsScreen(
 
             item {
                 SettingSection("무드등", Icons.Default.ColorLens) {
+                    Text(
+                        "빠른 모드",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     ChoiceRow(
                         values = AmbientPreset.entries,
                         selected = settings.ambientPreset,
                         label = { it.label },
                         onSelected = { preset -> onSettingsChange { it.copy(ambientPreset = preset) } },
                     )
-                    Text("사용자 지정 색상", style = MaterialTheme.typography.titleSmall)
-                    settings.customColors.take(3).forEachIndexed { index, selectedColor ->
-                        ColorPickerRow(
+                    Text("자유 색상 프로필", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "색상 원을 선택한 뒤 색조·채도·밝기를 조절하세요. 최대 6개의 색이 그라데이션과 오로라에 사용됩니다.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    settings.customColors.take(6).forEachIndexed { index, selectedColor ->
+                        FreeColorPickerRow(
                             index = index,
                             selectedColor = selectedColor,
                             onColorSelected = { color ->
                                 onSettingsChange { current ->
                                     val next = current.customColors.toMutableList()
-                                    while (next.size < 3) next += COLOR_PALETTE[next.size]
+                                    while (next.size <= index) {
+                                        next += DEFAULT_AMBIENT_COLORS[next.size.coerceAtMost(DEFAULT_AMBIENT_COLORS.lastIndex)]
+                                    }
                                     next[index] = color
                                     current.copy(customColors = next)
                                 }
                             },
                         )
                     }
-                    Text("기본 엠비언트 색상", style = MaterialTheme.typography.titleSmall)
+                    Text("대표 색상", style = MaterialTheme.typography.titleSmall)
                     ChoiceRow(
                         values = settings.customColors.indices.toList(),
                         selected = settings.ambientColorIndex,
-                        label = { "색상 ${it + 1}" },
+                        label = { "${it + 1}" },
                         onSelected = { index -> onSettingsChange { it.copy(ambientColorIndex = index) } },
                     )
                 }
@@ -209,6 +235,59 @@ fun SettingsScreen(
                     SwitchRow("세로 접힘 좌우 반전", "세로 힌지에서 시계를 오른쪽에 표시", settings.reverseVerticalPanes) {
                         onSettingsChange { old -> old.copy(reverseVerticalPanes = it) }
                     }
+                    SwitchRow(
+                        "커버 화면 정보 모드",
+                        "듀얼 화면에서 내부 무드등 대신 시계·일정·알림 요약을 표시",
+                        settings.coverOnlyMode,
+                    ) {
+                        onSettingsChange { old -> old.copy(coverOnlyMode = it) }
+                    }
+                }
+            }
+
+            item {
+                SettingSection("알람", Icons.Default.Alarm) {
+                    val context = LocalContext.current
+                    SwitchRow(
+                        "FoldStand 알람",
+                        "매일 같은 시각에 기기 알림 소리로 울립니다.",
+                        settings.alarmEnabled,
+                    ) {
+                        onSettingsChange { old -> old.copy(alarmEnabled = it) }
+                    }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("알람 시각", fontWeight = FontWeight.Medium)
+                            Text(
+                                "%02d:%02d".format(settings.alarmHour, settings.alarmMinute),
+                                style = MaterialTheme.typography.headlineMedium,
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                TimePickerDialog(
+                                    context,
+                                    { _, hour, minute ->
+                                        onSettingsChange { old -> old.copy(alarmHour = hour, alarmMinute = minute) }
+                                    },
+                                    settings.alarmHour,
+                                    settings.alarmMinute,
+                                    settings.use24Hour,
+                                ).show()
+                            },
+                        ) { Text("시간 선택") }
+                    }
+                    OutlinedButton(onClick = onPickAlarmRingtone, modifier = Modifier.fillMaxWidth()) {
+                        Text(if (settings.alarmRingtoneUri == null) "기본 알람 소리" else "알람 소리 선택됨")
+                    }
+                    OutlinedButton(onClick = onRequestAlarmNotificationPermission, modifier = Modifier.fillMaxWidth()) {
+                        Text("알람 알림 권한 허용")
+                    }
+                    Text(
+                        "알림 권한과 시스템 알림 소리를 사용합니다. 배터리 절전 정책에 따라 제조사가 알람을 제한할 수 있습니다.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 
@@ -416,38 +495,66 @@ private fun <T> ChoiceRow(
 }
 
 @Composable
-private fun ColorPickerRow(index: Int, selectedColor: Long, onColorSelected: (Long) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("색상 ${index + 1}", modifier = Modifier.width(62.dp), style = MaterialTheme.typography.bodySmall)
-        Row(
-            modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            COLOR_PALETTE.forEach { value ->
-                val selected = value == selectedColor
-                Surface(
-                    onClick = { onColorSelected(value) },
-                    modifier = Modifier.size(42.dp),
-                    shape = CircleShape,
-                    color = Color(value),
-                    border = if (selected) BorderStroke(3.dp, Color.White) else BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
-                ) {}
-            }
+private fun FreeColorPickerRow(index: Int, selectedColor: Long, onColorSelected: (Long) -> Unit) {
+    val hsv = remember(selectedColor) {
+        FloatArray(3).also { values ->
+            AndroidColor.colorToHSV((selectedColor and 0xFFFF_FFFFL).toInt(), values)
         }
     }
-}
+    var hue by remember(selectedColor) { mutableFloatStateOf(hsv[0]) }
+    var saturation by remember(selectedColor) { mutableFloatStateOf(hsv[1]) }
+    var value by remember(selectedColor) { mutableFloatStateOf(hsv[2]) }
 
-private val COLOR_PALETTE = listOf(
-    0xFF355C7DL,
-    0xFF6C5B7BL,
-    0xFFC06C84L,
-    0xFF2F6F64L,
-    0xFF617A55L,
-    0xFF355070L,
-    0xFF774360L,
-    0xFFB56576L,
-    0xFF8A5A44L,
-)
+    fun updateColor(nextHue: Float = hue, nextSaturation: Float = saturation, nextValue: Float = value) {
+        val argb = AndroidColor.HSVToColor(floatArrayOf(nextHue, nextSaturation, nextValue))
+        onColorSelected(argb.toLong() and 0xFFFF_FFFFL)
+    }
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                modifier = Modifier.size(42.dp),
+                shape = CircleShape,
+                color = Color(selectedColor),
+                border = BorderStroke(2.dp, Color.White.copy(alpha = 0.72f)),
+            ) {}
+            Text("색상 ${index + 1}", modifier = Modifier.padding(start = 10.dp), fontWeight = FontWeight.Medium)
+            Spacer(Modifier.weight(1f))
+            Text(
+                "#%08X".format(selectedColor),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Slider(
+            value = hue,
+            onValueChange = {
+                hue = it
+                updateColor(nextHue = it)
+            },
+            valueRange = 0f..360f,
+            steps = 35,
+            modifier = Modifier.semantics { contentDescription = "색상 ${index + 1} 색조" },
+        )
+        Slider(
+            value = saturation,
+            onValueChange = {
+                saturation = it
+                updateColor(nextSaturation = it)
+            },
+            valueRange = 0f..1f,
+            steps = 19,
+            modifier = Modifier.semantics { contentDescription = "색상 ${index + 1} 채도" },
+        )
+        Slider(
+            value = value,
+            onValueChange = {
+                value = it
+                updateColor(nextValue = it)
+            },
+            valueRange = 0.05f..1f,
+            steps = 19,
+            modifier = Modifier.semantics { contentDescription = "색상 ${index + 1} 밝기" },
+        )
+    }
+}

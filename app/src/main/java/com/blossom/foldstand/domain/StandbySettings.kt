@@ -23,8 +23,14 @@ data class StandbySettings(
     val reverseVerticalPanes: Boolean = false,
     val suggestWhenCharging: Boolean = false,
     val suggestWhenHalfOpened: Boolean = false,
+    val coverOnlyMode: Boolean = false,
     val customColors: List<Long> = DEFAULT_AMBIENT_COLORS,
     val ambientColorIndex: Int = 0,
+    val alarmEnabled: Boolean = false,
+    val alarmHour: Int = 7,
+    val alarmMinute: Int = 0,
+    val alarmLabel: String = "FoldStand 알람",
+    val alarmRingtoneUri: String? = null,
     val isRunning: Boolean = false,
     val hasSeenManualStartNotice: Boolean = false,
 ) {
@@ -34,7 +40,10 @@ data class StandbySettings(
 }
 
 val DEFAULT_AMBIENT_COLORS = listOf(
-    0xFF355C7DL,
-    0xFF6C5B7BL,
-    0xFFC06C84L,
+    0xFFFF4D6DL,
+    0xFFFFC857L,
+    0xFF4DFFB8L,
+    0xFF45C6FFL,
+    0xFF635BFFL,
+    0xFFFF4DDAL,
 )

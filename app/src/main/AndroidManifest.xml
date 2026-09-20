@@ -6,6 +6,8 @@
     <!-- Updates are downloaded and verified in-app, then handed to Android's
          user-confirmed PackageInstaller. This does not grant silent install. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:name=".FoldStandApp"
@@ -39,6 +41,21 @@
         <receiver
             android:name=".data.UpdateInstallReceiver"
             android:exported="false" />
+
+        <receiver
+            android:name=".data.AlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".data.AlarmBootReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 

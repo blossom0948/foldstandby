@@ -61,6 +61,11 @@ class SettingsRepositoryTest {
                 nightMode = NightModeOption.On,
                 customColors = listOf(0xFF112233, 0xFF445566, 0xFF778899),
                 ambientColorIndex = 2,
+                alarmEnabled = true,
+                alarmHour = 6,
+                alarmMinute = 45,
+                alarmLabel = "출근",
+                alarmRingtoneUri = "content://settings/system/alarm_alert",
                 isRunning = true,
             )
         }
@@ -73,8 +78,23 @@ class SettingsRepositoryTest {
         assertEquals(0.55f, restored.brightness)
         assertEquals(AutoDimOption.ThirtyMinutes, restored.autoDim)
         assertEquals(NightModeOption.On, restored.nightMode)
-        assertEquals(listOf(0xFF112233, 0xFF445566, 0xFF778899), restored.customColors)
+        assertEquals(
+            listOf(
+                0xFF112233,
+                0xFF445566,
+                0xFF778899,
+                0xFF45C6FF,
+                0xFF635BFF,
+                0xFFFF4DDA,
+            ),
+            restored.customColors,
+        )
         assertEquals(2, restored.ambientColorIndex)
+        assertTrue(restored.alarmEnabled)
+        assertEquals(6, restored.alarmHour)
+        assertEquals(45, restored.alarmMinute)
+        assertEquals("출근", restored.alarmLabel)
+        assertEquals("content://settings/system/alarm_alert", restored.alarmRingtoneUri)
         assertTrue(restored.isRunning)
     }
 

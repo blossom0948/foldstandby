@@ -13,7 +13,9 @@ private val FoldStandColors = darkColorScheme(
     onBackground = Color(0xFFF5F5F5),
     surface = Color(0xFF141414),
     onSurface = Color(0xFFF5F5F5),
-    onSurfaceVariant = Color(0xFFA6A6A6),
+    // StandBy is used at a distance and in dim rooms; keep supporting text
+    // above the WCAG-like contrast floor instead of the default muted gray.
+    onSurfaceVariant = Color(0xFFC6C6C6),
     error = Color(0xFFFFB4AB),
 )
 

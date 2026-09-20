@@ -3,6 +3,8 @@ package com.blossom.foldstand
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.RingtoneManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -28,7 +30,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.blossom.foldstand.fold.DualScreenController
 import com.blossom.foldstand.fold.FoldStateObserver
 import com.blossom.foldstand.ui.navigation.FoldStandNavGraph
-import com.blossom.foldstand.ui.standby.ClockPane
+import com.blossom.foldstand.ui.standby.CoverStandbyPane
 import com.blossom.foldstand.ui.theme.FoldStandTheme
 import com.blossom.foldstand.viewmodel.FoldStandViewModel
 import kotlinx.coroutines.launch
@@ -65,6 +67,17 @@ class MainActivity : ComponentActivity() {
             val calendarPermissionLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.RequestPermission(),
             ) { granted -> calendarPermissionGranted = granted }
+            val alarmRingtoneLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.StartActivityForResult(),
+            ) { result ->
+                if (result.resultCode == RESULT_OK) {
+                    val uri = result.data?.getParcelableExtra<android.net.Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+                    viewModel.updateSettings { it.copy(alarmRingtoneUri = uri?.toString()) }
+                }
+            }
+            val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission(),
+            ) { }
             FoldStandTheme {
                 FoldStandNavGraph(
                     viewModel = viewModel,
@@ -73,9 +86,10 @@ class MainActivity : ComponentActivity() {
                             val uiState by viewModel.uiState.collectAsState()
                             FoldStandTheme {
                                 Box(Modifier.fillMaxSize().background(Color.Black)) {
-                                    ClockPane(
+                                    CoverStandbyPane(
                                         settings = uiState.settings,
                                         battery = uiState.battery,
+                                        calendarPermissionGranted = calendarPermissionGranted,
                                     )
                                 }
                             }
@@ -86,6 +100,25 @@ class MainActivity : ComponentActivity() {
                     onRequestCalendarPermission = { calendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR) },
                     onOpenNotificationSettings = {
                         startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    },
+                    onPickAlarmRingtone = {
+                        alarmRingtoneLauncher.launch(
+                            Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "FoldStand 알람 소리")
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM))
+                                putExtra(
+                                    RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                                    viewModel.uiState.value.settings.alarmRingtoneUri?.let(android.net.Uri::parse),
+                                )
+                            },
+                        )
+                    },
+                    onRequestAlarmNotificationPermission = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
                     },
                     onInstallUpdate = { file -> (application as FoldStandApp).appUpdateRepository.install(this, file) },
                     onCheckForUpdates = viewModel::checkForUpdates,
